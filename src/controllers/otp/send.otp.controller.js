@@ -2,8 +2,7 @@ import axios from "axios";
 import { generateOTP, saveOTP } from "../../services/otp.service.js";
 
 
-import axios from "axios";
-import { generateOTP, saveOTP } from "../../services/otp.service.js";
+
 
 export const sendOTP = async (req, res) => {
   try {
