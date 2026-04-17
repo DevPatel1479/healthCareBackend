@@ -52,7 +52,7 @@ export const sendOTP = async (req, res) => {
 
     // Call API
     await axios.get(apiUrl, { timeout: 5000 });
-
+    
     return res.status(200).json({
       success: true,
       message: `OTP sent via ${type}`,

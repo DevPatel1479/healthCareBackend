@@ -7,8 +7,124 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id    Int     @id @default(autoincrement())
-  name  String
-  email String  @unique
+model care_tasks {
+  task_id          Int                      @id @default(autoincrement())
+  description      String                   @db.Text
+  task_category    care_tasks_task_category
+  scheduled_time   String?                  @db.VarChar(50)
+  applies_to_ME    Boolean?                 @default(false)
+  applies_to_SE    Boolean?                 @default(false)
+  applies_to_BE    Boolean?                 @default(false)
+  applies_to_PO    Boolean?                 @default(false)
+  applies_to_PD    Boolean?                 @default(false)
+  clinical_notes   String?                  @db.Text
+  task_assignments task_assignments[]
+}
+
+model caregiver_master {
+  caregiver_id     Int       @id
+  specialization   String?   @db.VarChar(100)
+  experience_years Int?      @default(0)
+  assigned_area    String?   @db.VarChar(100)
+  is_active        Boolean?  @default(true)
+  joining_date     DateTime? @db.Date
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @db.Timestamp(0)
+  users            users     @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_user")
+}
+
+model patients {
+  patient_id       Int                @id @default(autoincrement())
+  family_lead_id   Int
+  qr_code_hash     String             @unique(map: "qr_code_hash") @db.VarChar(255)
+  category         String
+  medical_history  String?            @db.Text
+  status           patients_status?   @default(active)
+  created_at       DateTime?          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(0)
+  users            users              @relation(fields: [family_lead_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_family_lead")
+  task_assignments task_assignments[]
+
+  @@index([family_lead_id], map: "fk_family_lead")
+}
+
+model shifts {
+  shift_id         Int                @id @default(autoincrement())
+  shift_name       String?            @db.VarChar(50)
+  start_time       DateTime?          @db.Time(0)
+  end_time         DateTime?          @db.Time(0)
+  task_assignments task_assignments[]
+}
+
+model task_assignments {
+  assignment_id  Int                          @id @default(autoincrement())
+  task_id        Int?
+  patient_id     Int?
+  caregiver_id   Int?
+  shift_id       Int?
+  status         task_assignments_status
+  time_done      DateTime?                    @db.Timestamp(0)
+  flag_level     task_assignments_flag_level? @default(green)
+  observation    String?                      @db.Text
+  photo_evidence String?                      @db.VarChar(512)
+  supervisor_val Boolean?                     @default(false)
+  care_tasks     care_tasks?                  @relation(fields: [task_id], references: [task_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_1")
+  patients       patients?                    @relation(fields: [patient_id], references: [patient_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_2")
+  users          users?                       @relation(fields: [caregiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_3")
+  shifts         shifts?                      @relation(fields: [shift_id], references: [shift_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_4")
+
+  @@index([caregiver_id], map: "caregiver_id")
+  @@index([patient_id], map: "patient_id")
+  @@index([shift_id], map: "shift_id")
+  @@index([task_id], map: "task_id")
+}
+
+model users {
+  user_id          Int                @id @default(autoincrement())
+  role             users_role
+  full_name        String             @db.VarChar(100)
+  email            String             @unique(map: "email") @db.VarChar(255)
+  phone_number     String             @db.VarChar(20)
+  password_hash    String             @db.VarChar(255)
+  is_verified      Boolean?           @default(false)
+  last_login       DateTime?          @db.Timestamp(0)
+  created_at       DateTime?          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(0)
+  caregiver_master caregiver_master?
+  patients         patients[]
+  task_assignments task_assignments[]
+}
+
+enum users_role {
+  admin
+  family_lead
+  caregiver
+  doctor
+}
+
+enum care_tasks_task_category {
+  Daily_Routine         @map("Daily/Routine")
+  Periodic
+  Unplanned_As_Required @map("Unplanned/As Required")
+}
+
+
+
+enum patients_status {
+  active
+  suspended
+  discharged
+}
+
+enum task_assignments_status {
+  completed
+  skipped
+  refused
+  pending
+}
+
+enum task_assignments_flag_level {
+  green
+  yellow
+  red
 }
