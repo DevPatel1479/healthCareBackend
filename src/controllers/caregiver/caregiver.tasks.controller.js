@@ -8,18 +8,22 @@ export const getCaregiverTasks = async (req, res) => {
       where: {
         caregiver_id: caregiverId,
       },
-      include: {
-        care_tasks: true, // 👈 automatically fetch task details
+       include: {
+        care_tasks: true,
         patients: {
-          select: {
-            user_id: true,
-            full_name: true,
-            phone_number: true,
+          include: {
+            users: {
+              select: {
+                user_id: true,
+                full_name: true,
+                phone_number: true,
+              },
+            },
           },
         },
-        orderBy: {
-          assignment_id: "desc",
-        },
+      },
+      orderBy: {
+        assignment_id: "desc",
       },
     });
 
@@ -30,11 +34,13 @@ export const getCaregiverTasks = async (req, res) => {
       flag_level: a.flag_level,
       observation: a.observation,
       task: a.care_tasks, // 👈 full task details
-      patient: a.patients
+       patient: a.patients
         ? {
-            id: a.patients.user_id,
-            name: a.patients.full_name,
-            phone: a.patients.phone_number,
+            id: a.patients.users.user_id,
+            name: a.patients.users.full_name,
+            phone: a.patients.users.phone_number,
+            patient_id: a.patients.patient_id,
+            category: a.patients.category,
           }
         : null,
     }));
