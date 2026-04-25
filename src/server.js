@@ -11,7 +11,7 @@
 
 
 
-import app from './app.js';
+
 import dotenv from 'dotenv';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -31,7 +31,7 @@ if (!process.env.VERCEL) {
   io = new Server(server, {
     cors: {
       origin: '*',
-      methods: ['GET', 'POST'],
+    
     },
   });
 
@@ -58,7 +58,6 @@ if (!process.env.VERCEL) {
 }
 
 export { io };
-export default app;
 
 // 🔥 Socket.IO setup
 // export const io = new Server(server, {
