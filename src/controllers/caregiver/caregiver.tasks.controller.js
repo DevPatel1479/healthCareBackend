@@ -10,6 +10,16 @@ export const getCaregiverTasks = async (req, res) => {
       },
       include: {
         care_tasks: true, // 👈 automatically fetch task details
+        patients: {
+          select: {
+            user_id: true,
+            full_name: true,
+            phone_number: true,
+          },
+        },
+        orderBy: {
+          assignment_id: "desc",
+        },
       },
     });
 
@@ -20,6 +30,13 @@ export const getCaregiverTasks = async (req, res) => {
       flag_level: a.flag_level,
       observation: a.observation,
       task: a.care_tasks, // 👈 full task details
+      patient: a.patients
+        ? {
+            id: a.patients.user_id,
+            name: a.patients.full_name,
+            phone: a.patients.phone_number,
+          }
+        : null,
     }));
 
     res.json({
