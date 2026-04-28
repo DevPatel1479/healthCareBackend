@@ -19,21 +19,18 @@ export const getPatientTasks = async (req, res) => {
             full_name: true,
             phone_number: true,
           },
-          patient: {
+          patients: {
             include: {
-              family_lead: {
-                include: {
-                  users: {
-                    select: {
-                      full_name: true,
-                    },
-                  },
+              users: {
+                select: {
+                  full_name: true,
                 },
               },
             },
           },
         },
       },
+
     });
 
     const result = assignments.map((a) => ({
@@ -43,9 +40,9 @@ export const getPatientTasks = async (req, res) => {
       flag_level: a.flag_level,
       observation: a.observation,
       task: a.care_tasks,
-      patient: a.patient?.family_lead?.user
+      patient: a.patients?.users
         ? {
-          name: a.patient.family_lead.user.full_name,
+          name: a.patients.users.full_name,
         }
         : null,
       caregiver: a.users
