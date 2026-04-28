@@ -15,11 +15,20 @@ export const getPatientTasks = async (req, res) => {
       include: {
         care_tasks: true,
         users: {
-    select: {
-      full_name: true,
-      phone_number: true,
-    },
-  },
+          select: {
+            full_name: true,
+            phone_number: true,
+          },
+          patients: {
+            include: {
+              users: {
+                select: {
+                  full_name: true,
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -30,12 +39,17 @@ export const getPatientTasks = async (req, res) => {
       flag_level: a.flag_level,
       observation: a.observation,
       task: a.care_tasks,
-        caregiver: a.users
-    ? {
-        name: a.users.full_name,
-        phone: a.users.phone_number,
-      }
-    : null,
+      patient: a.patients?.users
+        ? {
+          name: a.patients.users.full_name,
+        }
+        : null,
+      caregiver: a.users
+        ? {
+          name: a.users.full_name,
+          phone: a.users.phone_number,
+        }
+        : null,
     }));
 
     res.json({
@@ -71,12 +85,12 @@ export const createPatientTask = async (req, res) => {
 
     // 1️⃣ Create task
     const newTask = await prisma.care_tasks.create({
-  data: {
-    description,
-    task_category: "Daily_Routine", // ✅ FIXED
-    scheduled_time: scheduled_time || null,
-  },
-});
+      data: {
+        description,
+        task_category: "Daily_Routine", // ✅ FIXED
+        scheduled_time: scheduled_time || null,
+      },
+    });
 
     // 2️⃣ Reuse assignment logic (🔥 THIS IS KEY)
     req.body = {
