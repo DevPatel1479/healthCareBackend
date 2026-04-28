@@ -21,9 +21,13 @@ export const getPatientTasks = async (req, res) => {
           },
           patients: {
             include: {
-              users: {
-                select: {
-                  full_name: true,
+              family_lead: {
+                include: {
+                  users: {
+                    select: {
+                      full_name: true,
+                    },
+                  },
                 },
               },
             },
@@ -39,9 +43,9 @@ export const getPatientTasks = async (req, res) => {
       flag_level: a.flag_level,
       observation: a.observation,
       task: a.care_tasks,
-      patient: a.patients?.users
+      patient: a.patients?.family_lead?.users
         ? {
-          name: a.patients.users.full_name,
+          name: a.patients.family_lead.users.full_name,
         }
         : null,
       caregiver: a.users
