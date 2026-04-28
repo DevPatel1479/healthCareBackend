@@ -8,8 +8,15 @@ export const getCaregiverTasks = async (req, res) => {
       where: {
         caregiver_id: caregiverId,
       },
-       include: {
+      include: {
         care_tasks: true,
+        users: {
+          select: {
+            user_id: true,
+            full_name: true,
+            phone_number: true,
+          },
+        },
         patients: {
           include: {
             users: {
@@ -34,14 +41,21 @@ export const getCaregiverTasks = async (req, res) => {
       flag_level: a.flag_level,
       observation: a.observation,
       task: a.care_tasks, // 👈 full task details
-       patient: a.patients
+      caregiver: a.users
         ? {
-            id: a.patients.users.user_id,
-            name: a.patients.users.full_name,
-            phone: a.patients.users.phone_number,
-            patient_id: a.patients.patient_id,
-            category: a.patients.category,
-          }
+          id: a.users.user_id,
+          name: a.users.full_name,
+          phone: a.users.phone_number,
+        }
+        : null,
+      patient: a.patients
+        ? {
+          id: a.patients.users.user_id,
+          name: a.patients.users.full_name,
+          phone: a.patients.users.phone_number,
+          patient_id: a.patients.patient_id,
+          category: a.patients.category,
+        }
         : null,
     }));
 
