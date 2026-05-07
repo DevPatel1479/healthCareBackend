@@ -142,102 +142,79 @@ import prisma from "../lib/prisma.js";
 // testing ******************
 
 
+
 export async function recreateDailyRoutineTasks(io = null) {
 
-    // current time
-    const now = new Date();
+    try {
 
-    // current minute start
-    const currentMinuteStart = new Date(now);
-    currentMinuteStart.setSeconds(0, 0);
+        // latest created tasks
+        const previousMinuteTasks =
+            await prisma.task_assignments.findMany({
 
-    // next minute start
-    const nextMinuteStart = new Date(currentMinuteStart);
-    nextMinuteStart.setMinutes(
-        nextMinuteStart.getMinutes() + 1
-    );
-
-    // previous minute start
-    const previousMinuteStart = new Date(currentMinuteStart);
-    previousMinuteStart.setMinutes(
-        previousMinuteStart.getMinutes() - 1
-    );
-
-    // previous minute tasks
-    const previousMinuteTasks =
-        await prisma.task_assignments.findMany({
-            where: {
-                created_at: {
-                    gte: previousMinuteStart,
-                    lt: currentMinuteStart
+                where: {
+                    care_tasks: {
+                        task_category: "Daily_Routine"
+                    }
                 },
 
-                care_tasks: {
-                    task_category: "Daily_Routine"
+                orderBy: {
+                    assignment_id: "desc"
+                },
+
+                select: {
+                    assignment_id: true,
+                    patient_id: true,
+                    task_id: true,
+                    caregiver_id: true,
+                    shift_id: true
                 }
-            },
-
-            select: {
-                patient_id: true,
-                task_id: true,
-                caregiver_id: true,
-                shift_id: true
-            }
-        });
-
-    // current minute tasks
-    const currentMinuteTasks =
-        await prisma.task_assignments.findMany({
-            where: {
-                created_at: {
-                    gte: currentMinuteStart,
-                    lt: nextMinuteStart
-                }
-            },
-
-            select: {
-                patient_id: true,
-                task_id: true
-            }
-        });
-
-    const currentSet = new Set(
-        currentMinuteTasks.map(
-            item => `${item.patient_id}-${item.task_id}`
-        )
-    );
-
-    const insertData = [];
-
-    for (const task of previousMinuteTasks) {
-
-        const key =
-            `${task.patient_id}-${task.task_id}`;
-
-        // prevent duplicate in same minute
-        if (!currentSet.has(key)) {
-
-            insertData.push({
-
-                patient_id: task.patient_id,
-                task_id: task.task_id,
-                caregiver_id: task.caregiver_id,
-                shift_id: task.shift_id,
-
-                status: "pending",
-
-                time_done: null,
-                observation: null,
-                photo_evidence: null,
-                supervisor_val: false,
-                flag_level: "green"
             });
 
+        // prevent duplicates in same execution
+        const currentSet = new Set();
+
+        const insertData = [];
+
+        for (const task of previousMinuteTasks) {
+
+            const key =
+                `${task.patient_id}-${task.task_id}`;
+
+            // skip duplicates
+            if (!currentSet.has(key)) {
+
+                currentSet.add(key);
+
+                insertData.push({
+
+                    patient_id: task.patient_id,
+                    task_id: task.task_id,
+                    caregiver_id: task.caregiver_id,
+                    shift_id: task.shift_id,
+
+                    // reset state
+                    status: "pending",
+
+                    time_done: null,
+                    observation: null,
+                    photo_evidence: null,
+                    supervisor_val: false,
+                    flag_level: "green"
+                });
+            }
         }
-    }
 
-    if (insertData.length > 0) {
+        // no tasks
+        if (!insertData.length) {
 
+            return {
+                success: true,
+                count: 0,
+                message: "No tasks found"
+            };
+        }
+
+        // create recreated tasks
         await prisma.task_assignments.createMany({
             data: insertData
         });
@@ -251,17 +228,24 @@ export async function recreateDailyRoutineTasks(io = null) {
 
             for (const task of insertData) {
 
-                io.to(
-                    `patient_${task.patient_id}`
-                ).emit(
-                    "daily_tasks_recreated",
-                    {
-                        patient_id: task.patient_id,
-                        task_id: task.task_id,
-                        status: "pending"
-                    }
-                );
+                // patient room
+                if (task.patient_id) {
 
+                    io.to(
+                        `patient_${task.patient_id}`
+                    ).emit(
+                        "daily_tasks_recreated",
+                        {
+                            patient_id: task.patient_id,
+                            task_id: task.task_id,
+                            caregiver_id: task.caregiver_id,
+                            shift_id: task.shift_id,
+                            status: "pending"
+                        }
+                    );
+                }
+
+                // caregiver room
                 if (task.caregiver_id) {
 
                     io.to(
@@ -271,6 +255,8 @@ export async function recreateDailyRoutineTasks(io = null) {
                         {
                             patient_id: task.patient_id,
                             task_id: task.task_id,
+                            caregiver_id: task.caregiver_id,
+                            shift_id: task.shift_id,
                             status: "pending"
                         }
                     );
@@ -282,11 +268,17 @@ export async function recreateDailyRoutineTasks(io = null) {
             success: true,
             count: insertData.length
         };
-    }
 
-    return {
-        success: true,
-        count: 0,
-        message: "Already recreated this minute"
-    };
+    } catch (error) {
+
+        console.error(
+            "Error recreating tasks:",
+            error
+        );
+
+        return {
+            success: false,
+            error: error.message
+        };
+    }
 }
