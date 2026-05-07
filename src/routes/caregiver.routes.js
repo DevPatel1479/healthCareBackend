@@ -5,12 +5,13 @@ import { getCaregiverTasks } from '../controllers/caregiver/caregiver.tasks.cont
 import { updateTaskStatus } from '../controllers/caregiver/caregiver.update.tasks.controller.js';
 import { getAllCaregivers } from '../controllers/caregiver/get.all.caregivers.controller.js';
 import { getCaregiverOverallReport, getCaregiverPatientWiseReport } from '../controllers/caregiver/caregiver.report.controller.js';
-
+import { getCaregiverDetails } from '../controllers/caregiver/get.caregiver.details.controller.js';
 const router = express.Router()
 
 router.get("/caregiver/:id/tasks", getCaregiverTasks);
 router.patch("/tasks/update-status", updateTaskStatus);
 router.get("/caregiver/all", getAllCaregivers);
+router.get("/caregiver/details/:caregiver_id", getCaregiverDetails);
 router.post(
     "/caregiver/overall",
     getCaregiverOverallReport
