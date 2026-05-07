@@ -77,7 +77,8 @@ export const getPatientTasks = async (req, res) => {
 
 export const createPatientTask = async (req, res) => {
   try {
-    const { description, scheduled_time } = req.body;
+    
+    const { description, scheduled_time, task_category } = req.body;
 
     if (!description) {
       return res.status(400).json({
@@ -90,12 +91,12 @@ export const createPatientTask = async (req, res) => {
     const newTask = await prisma.care_tasks.create({
       data: {
         description,
-        task_category: "Daily_Routine", // ✅ FIXED
+        task_category: task_category || "Daily_Routine",
         scheduled_time: scheduled_time || null,
       },
     });
 
-    // 2️⃣ Reuse assignment logic (🔥 THIS IS KEY)
+
     req.body = {
       task_id: newTask.task_id,
       patient_id: 5,
