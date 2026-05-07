@@ -143,142 +143,142 @@ import prisma from "../lib/prisma.js";
 
 
 
-export async function recreateDailyRoutineTasks(io = null) {
+// export async function recreateDailyRoutineTasks(io = null) {
 
-    try {
+//     try {
 
-        // latest created tasks
-        const previousMinuteTasks =
-            await prisma.task_assignments.findMany({
+//         // latest created tasks
+//         const previousMinuteTasks =
+//             await prisma.task_assignments.findMany({
 
-                where: {
-                    care_tasks: {
-                        task_category: "Daily_Routine"
-                    }
-                },
+//                 where: {
+//                     care_tasks: {
+//                         task_category: "Daily_Routine"
+//                     }
+//                 },
 
-                orderBy: {
-                    assignment_id: "desc"
-                },
+//                 orderBy: {
+//                     assignment_id: "desc"
+//                 },
 
-                select: {
-                    assignment_id: true,
-                    patient_id: true,
-                    task_id: true,
-                    caregiver_id: true,
-                    shift_id: true
-                }
-            });
+//                 select: {
+//                     assignment_id: true,
+//                     patient_id: true,
+//                     task_id: true,
+//                     caregiver_id: true,
+//                     shift_id: true
+//                 }
+//             });
 
-        // prevent duplicates in same execution
-        const currentSet = new Set();
+//         // prevent duplicates in same execution
+//         const currentSet = new Set();
 
-        const insertData = [];
+//         const insertData = [];
 
-        for (const task of previousMinuteTasks) {
+//         for (const task of previousMinuteTasks) {
 
-            const key =
-                `${task.patient_id}-${task.task_id}`;
+//             const key =
+//                 `${task.patient_id}-${task.task_id}`;
 
-            // skip duplicates
-            if (!currentSet.has(key)) {
+//             // skip duplicates
+//             if (!currentSet.has(key)) {
 
-                currentSet.add(key);
+//                 currentSet.add(key);
 
-                insertData.push({
+//                 insertData.push({
 
-                    patient_id: task.patient_id,
-                    task_id: task.task_id,
-                    caregiver_id: task.caregiver_id,
-                    shift_id: task.shift_id,
+//                     patient_id: task.patient_id,
+//                     task_id: task.task_id,
+//                     caregiver_id: task.caregiver_id,
+//                     shift_id: task.shift_id,
 
-                    // reset state
-                    status: "pending",
+//                     // reset state
+//                     status: "pending",
 
-                    time_done: null,
-                    observation: null,
-                    photo_evidence: null,
-                    supervisor_val: false,
-                    flag_level: "green"
-                });
-            }
-        }
+//                     time_done: null,
+//                     observation: null,
+//                     photo_evidence: null,
+//                     supervisor_val: false,
+//                     flag_level: "green"
+//                 });
+//             }
+//         }
 
-        // no tasks
-        if (!insertData.length) {
+//         // no tasks
+//         if (!insertData.length) {
 
-            return {
-                success: true,
-                count: 0,
-                message: "No tasks found"
-            };
-        }
+//             return {
+//                 success: true,
+//                 count: 0,
+//                 message: "No tasks found"
+//             };
+//         }
 
-        // create recreated tasks
-        await prisma.task_assignments.createMany({
-            data: insertData
-        });
+//         // create recreated tasks
+//         await prisma.task_assignments.createMany({
+//             data: insertData
+//         });
 
-        console.log(
-            `${insertData.length} tasks recreated for testing`
-        );
+//         console.log(
+//             `${insertData.length} tasks recreated for testing`
+//         );
 
-        // realtime emit
-        if (io) {
+//         // realtime emit
+//         if (io) {
 
-            for (const task of insertData) {
+//             for (const task of insertData) {
 
-                // patient room
-                if (task.patient_id) {
+//                 // patient room
+//                 if (task.patient_id) {
 
-                    io.to(
-                        `patient_${task.patient_id}`
-                    ).emit(
-                        "daily_tasks_recreated",
-                        {
-                            patient_id: task.patient_id,
-                            task_id: task.task_id,
-                            caregiver_id: task.caregiver_id,
-                            shift_id: task.shift_id,
-                            status: "pending"
-                        }
-                    );
-                }
+//                     io.to(
+//                         `patient_${task.patient_id}`
+//                     ).emit(
+//                         "daily_tasks_recreated",
+//                         {
+//                             patient_id: task.patient_id,
+//                             task_id: task.task_id,
+//                             caregiver_id: task.caregiver_id,
+//                             shift_id: task.shift_id,
+//                             status: "pending"
+//                         }
+//                     );
+//                 }
 
-                // caregiver room
-                if (task.caregiver_id) {
+//                 // caregiver room
+//                 if (task.caregiver_id) {
 
-                    io.to(
-                        `caregiver_${task.caregiver_id}`
-                    ).emit(
-                        "daily_tasks_recreated",
-                        {
-                            patient_id: task.patient_id,
-                            task_id: task.task_id,
-                            caregiver_id: task.caregiver_id,
-                            shift_id: task.shift_id,
-                            status: "pending"
-                        }
-                    );
-                }
-            }
-        }
+//                     io.to(
+//                         `caregiver_${task.caregiver_id}`
+//                     ).emit(
+//                         "daily_tasks_recreated",
+//                         {
+//                             patient_id: task.patient_id,
+//                             task_id: task.task_id,
+//                             caregiver_id: task.caregiver_id,
+//                             shift_id: task.shift_id,
+//                             status: "pending"
+//                         }
+//                     );
+//                 }
+//             }
+//         }
 
-        return {
-            success: true,
-            count: insertData.length
-        };
+//         return {
+//             success: true,
+//             count: insertData.length
+//         };
 
-    } catch (error) {
+//     } catch (error) {
 
-        console.error(
-            "Error recreating tasks:",
-            error
-        );
+//         console.error(
+//             "Error recreating tasks:",
+//             error
+//         );
 
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-}
+//         return {
+//             success: false,
+//             error: error.message
+//         };
+//     }
+// }
