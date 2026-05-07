@@ -35,20 +35,20 @@ if (!process.env.VERCEL) {
     
     },
   });
-    setInterval(async () => {
+  //   setInterval(async () => {
 
-    console.log(
-      'Running minute recreation test...'
-    );
+  //   console.log(
+  //     'Running minute recreation test...'
+  //   );
 
-    await recreateDailyRoutineTasks(io);
+  //   await recreateDailyRoutineTasks(io);
 
-  }, 60 * 1000);
+  // }, 60 * 1000);
 
   io.on('connection',async  (socket) =>  {
     console.log('Client connected:', socket.id);
 
-    await recreateDailyRoutineTasks(io);
+    // await recreateDailyRoutineTasks(io);
 
     socket.on('join_caregiver', (caregiverId) => {
       socket.join(`caregiver_${caregiverId}`);
