@@ -15,7 +15,7 @@ import app from './app.js'
 import dotenv from 'dotenv';
 import http from 'http';
 import { Server } from 'socket.io';
-import { recreateDailyRoutineTasks } from './services/recreate.daily.routine.tasks.js';
+
 
 dotenv.config();
 
@@ -35,20 +35,11 @@ if (!process.env.VERCEL) {
     
     },
   });
-  //   setInterval(async () => {
 
-  //   console.log(
-  //     'Running minute recreation test...'
-  //   );
-
-  //   await recreateDailyRoutineTasks(io);
-
-  // }, 60 * 1000);
-
-  io.on('connection',async  (socket) =>  {
+  io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    // await recreateDailyRoutineTasks(io);
+    
 
     socket.on('join_caregiver', (caregiverId) => {
       socket.join(`caregiver_${caregiverId}`);
