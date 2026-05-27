@@ -78,14 +78,53 @@ export const getPatientTasks = async (req, res) => {
 export const createPatientTask = async (req, res) => {
   try {
 
-    const { description, scheduled_time, task_category } = req.body;
+    const { patient_id, description, scheduled_time, task_category } = req.body;
 
-    if (!description) {
+    if (!patient_id || !description) {
       return res.status(400).json({
         success: false,
-        message: "Task description is required",
+        message: "patient_id and description are required",
       });
     }
+
+    const patient = await prisma.patients.findUnique({
+      where: {
+        patient_id: Number(patient_id),
+      },
+    });
+
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found",
+      });
+    }
+    const activeShift = await prisma.caregiver_shifts.findFirst({
+      where: {
+        patient_id: Number(patient_id),
+
+        // active shift
+        end_time: null,
+
+        verified: true,
+      },
+
+      orderBy: {
+        start_time: "desc",
+      },
+    });
+
+    // ✅ no caregiver assigned
+    if (!activeShift) {
+      return res.status(404).json({
+        success: false,
+        message: "No active caregiver shift found for this patient",
+      });
+    }
+
+    const caregiver_id = activeShift.caregiver_id;
+    const shift_id = activeShift.shift_id;
+
 
     // 1️⃣ Create task
     const newTask = await prisma.care_tasks.create({
@@ -99,9 +138,9 @@ export const createPatientTask = async (req, res) => {
 
     req.body = {
       task_id: newTask.task_id,
-      patient_id: 5,
-      caregiver_id: 4,
-      shift_id: 23,
+      patient_id: Number(patient_id),
+      caregiver_id: caregiver_id,
+      shift_id: shift_id,
       status: "pending",
     };
 
