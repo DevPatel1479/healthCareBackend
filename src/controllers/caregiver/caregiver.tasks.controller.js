@@ -2,7 +2,7 @@ import prisma from "../../lib/prisma.js";
 
 export const getCaregiverTasks = async (req, res) => {
   try {
-    const caregiverId = Number(req.params.caregiverId);
+    const caregiverId = Number(req.params.id);
     console.log("Received caregiver ID:", caregiverId); // Debug log
     if (!caregiverId || isNaN(caregiverId)) {
       return res.status(400).json({
