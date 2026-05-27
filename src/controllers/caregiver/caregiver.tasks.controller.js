@@ -11,18 +11,24 @@ export const getCaregiverTasks = async (req, res) => {
       });
     }
 
-    // ✅ GET ACTIVE PATIENT ASSIGNED TO CAREGIVER
+    const now = new Date();
+
+    // ==============================
+    // 1. GET ACTIVE SHIFT (SOURCE OF TRUTH)
+    // ==============================
     const activeShift = await prisma.caregiver_shifts.findFirst({
       where: {
         caregiver_id: caregiverId,
         verified: true,
-        end_time: null,
+        start_time: { lte: now },
+        OR: [
+          { end_time: null },
+          { end_time: { gte: now } },
+        ],
       },
-
       orderBy: {
         start_time: "desc",
       },
-
       include: {
         patients: {
           include: {
@@ -35,20 +41,66 @@ export const getCaregiverTasks = async (req, res) => {
             },
           },
         },
-
         shifts: true,
       },
     });
 
-    // ✅ GET TASKS
+    // ==============================
+    // 2. FALLBACK SHIFT (if no active shift exists)
+    // ==============================
+    let fallbackShift = null;
+
+    if (!activeShift) {
+      fallbackShift = await prisma.caregiver_shifts.findFirst({
+        where: {
+          caregiver_id: caregiverId,
+          verified: true,
+        },
+        orderBy: {
+          start_time: "desc",
+        },
+        include: {
+          patients: {
+            include: {
+              users: {
+                select: {
+                  user_id: true,
+                  full_name: true,
+                  phone_number: true,
+                },
+              },
+            },
+          },
+          shifts: true,
+        },
+      });
+    }
+
+    const shiftToUse = activeShift || fallbackShift;
+
+    // ==============================
+    // 3. BUILD CURRENT PATIENT
+    // ==============================
+    const patientInfo = shiftToUse?.patients
+      ? {
+        id: shiftToUse.patients.users.user_id,
+        name: shiftToUse.patients.users.full_name,
+        phone: shiftToUse.patients.users.phone_number,
+        patient_id: shiftToUse.patients.patient_id,
+        category: shiftToUse.patients.category,
+        shift: shiftToUse.shifts?.shift_name || null,
+      }
+      : null;
+
+    // ==============================
+    // 4. GET TASKS
+    // ==============================
     const assignments = await prisma.task_assignments.findMany({
       where: {
         caregiver_id: caregiverId,
       },
-
       include: {
         care_tasks: true,
-
         users: {
           select: {
             user_id: true,
@@ -57,24 +109,14 @@ export const getCaregiverTasks = async (req, res) => {
           },
         },
       },
-
       orderBy: {
         assignment_id: "desc",
       },
     });
 
-    // ✅ SINGLE PATIENT INFO FROM caregiver_shifts
-    const patientInfo = activeShift?.patients
-      ? {
-        id: activeShift.patients.users.user_id,
-        name: activeShift.patients.users.full_name,
-        phone: activeShift.patients.users.phone_number,
-        patient_id: activeShift.patients.patient_id,
-        category: activeShift.patients.category,
-        shift: activeShift.shifts?.shift_name || null,
-      }
-      : null;
-
+    // ==============================
+    // 5. MAP RESPONSE
+    // ==============================
     const result = assignments.map((a) => ({
       assignment_id: a.assignment_id,
       status: a.status,
@@ -92,13 +134,16 @@ export const getCaregiverTasks = async (req, res) => {
         }
         : null,
 
-      // ✅ SAME ASSIGNED PATIENT FOR THIS CAREGIVER
+      // SAME CURRENT PATIENT FOR ALL TASKS
       patient: patientInfo,
     }));
 
+    // ==============================
+    // 6. RESPONSE
+    // ==============================
     return res.json({
       success: true,
-      patient: patientInfo, // ✅ separate patient object
+      patient: patientInfo,
       data: result,
     });
 
