@@ -9,6 +9,7 @@ export const getCaregiverTasks = async (req, res) => {
         message: "Invalid caregiver id",
       });
     }
+    console.log("Fetching tasks for caregiver ID:", caregiverId); // Debug log
     const assignments = await prisma.task_assignments.findMany({
       where: {
         caregiver_id: caregiverId,
