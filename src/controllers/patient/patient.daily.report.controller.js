@@ -18,14 +18,15 @@ export const getPatientDailyReport = async (req, res) => {
         // const startOfDay = new Date(`${date}T00:00:00`);
         // const endOfDay = new Date(`${date}T23:59:59`);
 
-
+        const startOfDay = new Date(`${date}T00:00:00.000`);
+        const endOfDay = new Date(`${date}T23:59:59.999`);
 
         const assignments = await prisma.task_assignments.findMany({
             where: {
                 patient_id: Number(patient_id),
                 time_done: {
-                    gte: new Date(`${date}T00:00:00.000Z`),
-                    lte: new Date(`${date}T23:59:59.999Z`),
+                    gte: startOfDay,
+                    lte: endOfDay,
                 },
             },
             include: {
