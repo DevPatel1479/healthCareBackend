@@ -33,6 +33,33 @@ model caregiver_master {
   users            users     @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_user")
 }
 
+model caregiver_shifts {
+  shift_assignment_id Int @id @default(autoincrement())
+
+  patient_id   Int
+  caregiver_id Int
+  shift_id     Int
+
+  start_time DateTime  @db.Timestamp(0)
+  end_time   DateTime? @db.Timestamp(0)
+
+  check_in_method String? @default("qr") @db.VarChar(20)
+
+  verified Boolean? @default(true)
+
+  handover_notes String? @db.Text
+
+  patients patients @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_patient")
+
+  users users @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_user")
+
+  shifts shifts @relation(fields: [shift_id], references: [shift_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_shift")
+
+  @@index([patient_id])
+  @@index([caregiver_id])
+  @@index([shift_id])
+}
+
 model patients {
   patient_id       Int                @id @default(autoincrement())
   family_lead_id   Int
@@ -44,6 +71,7 @@ model patients {
   updated_at       DateTime?          @default(now()) @db.Timestamp(0)
   users            users              @relation(fields: [family_lead_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_family_lead")
   task_assignments task_assignments[]
+  caregiver_shifts caregiver_shifts[]
 
   @@index([family_lead_id], map: "fk_family_lead")
 }
@@ -54,6 +82,7 @@ model shifts {
   start_time       DateTime?          @db.Time(0)
   end_time         DateTime?          @db.Time(0)
   task_assignments task_assignments[]
+  caregiver_shifts caregiver_shifts[]
 }
 
 model task_assignments {
@@ -93,6 +122,7 @@ model users {
   caregiver_master caregiver_master?
   patients         patients[]
   task_assignments task_assignments[]
+  caregiver_shifts caregiver_shifts[]
 }
 
 enum users_role {
@@ -130,6 +160,6 @@ enum task_assignments_flag_level {
 enum patients_category {
   A @map("1A")
   B @map("1B")
-  // 2 @map("2")
-  // 3 @map("3")
+  C @map("2")
+  D @map("3")
 }
