@@ -2,8 +2,13 @@ import prisma from "../../lib/prisma.js";
 
 export const getCaregiverTasks = async (req, res) => {
   try {
-    const caregiverId = 4; // fixed as you asked
-
+    const caregiverId = req.params.caregiverId; // fixed as you asked
+    if (!caregiverId || isNaN(caregiverId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid caregiver id",
+      });
+    }
     const assignments = await prisma.task_assignments.findMany({
       where: {
         caregiver_id: caregiverId,

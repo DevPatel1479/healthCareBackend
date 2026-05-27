@@ -45,9 +45,9 @@ export const updateTaskStatus = async (req, res) => {
         message: "Task not found or not assigned to this caregiver",
       });
     }
-const nowIST = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
-);
+    const nowIST = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    );
     // 🔹 Update task
     const updatedTask = await prisma.task_assignments.update({
       where: { assignment_id },
