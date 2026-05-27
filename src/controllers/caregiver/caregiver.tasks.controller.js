@@ -1,7 +1,6 @@
 import prisma from "../../lib/prisma.js";
 
 export const getCaregiverTasks = async (req, res) => {
-
   try {
     const caregiverId = Number(req.params.id);
 
@@ -12,49 +11,16 @@ export const getCaregiverTasks = async (req, res) => {
       });
     }
 
-    // =========================
-    // TASKS
-    // =========================
-
-    const assignments = await prisma.task_assignments.findMany({
-      where: {
-        caregiver_id: caregiverId,
-      },
-
-      include: {
-        care_tasks: true,
-      },
-
-      orderBy: {
-        assignment_id: "desc",
-      },
-    });
-
-    // =========================
-    // CAREGIVER INFO
-    // =========================
-
-    const caregiverInfo = await prisma.users.findUnique({
-      where: {
-        user_id: caregiverId,
-      },
-
-      select: {
-        user_id: true,
-        full_name: true,
-        phone_number: true,
-      },
-    });
-
-    // =========================
-    // ASSIGNED PATIENTS
-    // =========================
-
-    const assignedPatients = await prisma.caregiver_shifts.findMany({
+    // ✅ GET ACTIVE PATIENT ASSIGNED TO CAREGIVER
+    const activeShift = await prisma.caregiver_shifts.findFirst({
       where: {
         caregiver_id: caregiverId,
         verified: true,
         end_time: null,
+      },
+
+      orderBy: {
+        start_time: "desc",
       },
 
       include: {
@@ -74,61 +40,72 @@ export const getCaregiverTasks = async (req, res) => {
       },
     });
 
-    // =========================
-    // TASK RESULT
-    // =========================
+    // ✅ GET TASKS
+    const assignments = await prisma.task_assignments.findMany({
+      where: {
+        caregiver_id: caregiverId,
+      },
 
-    const tasks = assignments.map((a) => ({
+      include: {
+        care_tasks: true,
+
+        users: {
+          select: {
+            user_id: true,
+            full_name: true,
+            phone_number: true,
+          },
+        },
+      },
+
+      orderBy: {
+        assignment_id: "desc",
+      },
+    });
+
+    // ✅ SINGLE PATIENT INFO FROM caregiver_shifts
+    const patientInfo = activeShift?.patients
+      ? {
+        id: activeShift.patients.users.user_id,
+        name: activeShift.patients.users.full_name,
+        phone: activeShift.patients.users.phone_number,
+        patient_id: activeShift.patients.patient_id,
+        category: activeShift.patients.category,
+        shift: activeShift.shifts?.shift_name || null,
+      }
+      : null;
+
+    const result = assignments.map((a) => ({
       assignment_id: a.assignment_id,
-      patient_id: a.patient_id,
-      shift_id: a.shift_id,
-
       status: a.status,
       time_done: a.time_done,
       flag_level: a.flag_level,
       observation: a.observation,
 
       task: a.care_tasks,
-    }));
 
-    // =========================
-    // PATIENT RESULT
-    // =========================
+      caregiver: a.users
+        ? {
+          id: a.users.user_id,
+          name: a.users.full_name,
+          phone: a.users.phone_number,
+        }
+        : null,
 
-    const patients = assignedPatients.map((p) => ({
-      patient_id: p.patients.patient_id,
-
-      name: p.patients.users.full_name,
-
-      phone: p.patients.users.phone_number,
-
-      category: p.patients.category,
-
-      shift: p.shifts?.shift_name,
-
-      shift_start: p.start_time,
+      // ✅ SAME ASSIGNED PATIENT FOR THIS CAREGIVER
+      patient: patientInfo,
     }));
 
     return res.json({
       success: true,
-
-      caregiver: caregiverInfo
-        ? {
-          id: caregiverInfo.user_id,
-          name: caregiverInfo.full_name,
-          phone: caregiverInfo.phone_number,
-        }
-        : null,
-
-      patients,
-
-      data: tasks,
+      patient: patientInfo, // ✅ separate patient object
+      data: result,
     });
 
   } catch (err) {
     console.error(err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server error",
     });
