@@ -6,6 +6,7 @@ import caregiverRoutes from './routes/caregiver.routes.js';
 import patientRoutes from './routes/patient.routes.js';
 import { errorHandler } from './middlewares/error.middleware.js'
 import taskAssignmentRoutes from './routes/task_assignment.routes.js';
+import loginRoutes from './routes/login.routes.js';
 
 const app = express()
 
@@ -17,7 +18,7 @@ app.use('/api', otpRoutes);
 app.use('/api', caregiverRoutes);
 app.use('/api', patientRoutes);
 app.use('/api/admin', taskAssignmentRoutes);
-
+app.use('/api', loginRoutes);
 
 app.use(errorHandler)
 
