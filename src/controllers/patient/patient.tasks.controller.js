@@ -33,6 +33,29 @@ export const getPatientTasks = async (req, res) => {
       },
 
     });
+    const activeCaregiverShift =
+      await prisma.caregiver_shifts.findFirst({
+
+        where: {
+          patient_id: patientId,
+          verified: true,
+        },
+
+        orderBy: {
+          start_time: "desc",
+        },
+
+        include: {
+          users: {
+            select: {
+              full_name: true,
+              phone_number: true,
+            },
+          },
+
+          shifts: true,
+        },
+      });
 
     const result = assignments.map((a) => ({
       assignment_id: a.assignment_id,
@@ -40,23 +63,27 @@ export const getPatientTasks = async (req, res) => {
       time_done: a.time_done,
       flag_level: a.flag_level,
       observation: a.observation,
+
       task: a.care_tasks,
+
       patient: a.patients?.users
         ? {
           name: a.patients.users.full_name,
         }
         : null,
-
-      caregiver: a.users
-        ? {
-          name: a.users.full_name,
-          phone: a.users.phone_number,
-        }
-        : null,
     }));
 
-    res.json({
+    return res.json({
       success: true,
+
+      caregiver: activeCaregiverShift?.users
+        ? {
+          name: activeCaregiverShift.users.full_name,
+          phone: activeCaregiverShift.users.phone_number,
+          shift: activeCaregiverShift.shifts?.shift_name,
+        }
+        : null,
+
       data: result,
     });
 
