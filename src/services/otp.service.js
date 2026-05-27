@@ -1,7 +1,7 @@
 const otpStore = new Map();
 
 // Generate OTP
-export   const generateOTP = () => {
+export const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
@@ -16,7 +16,7 @@ export const saveOTP = (phone, otp) => {
 // Verify OTP
 export const verifyOTP = (phone, otp) => {
   const record = otpStore.get(phone);
-
+  console.log(`OTP mismatch for ${phone}: expected ${record.otp}, got ${otp}`); // Debug log
   if (!record) return { valid: false, reason: 'OTP not found' };
 
   if (Date.now() > record.expiresAt) {
@@ -25,6 +25,7 @@ export const verifyOTP = (phone, otp) => {
   }
 
   if (record.otp !== otp) {
+
     return { valid: false, reason: 'Invalid OTP' };
   }
 
