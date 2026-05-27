@@ -10,7 +10,7 @@ export const getPatientTasks = async (req, res) => {
 
     const assignments = await prisma.task_assignments.findMany({
       where: {
-        patient_id: patientId, // 🔥 filter by patient
+        patient_id: patientId,
       },
       include: {
         care_tasks: true,
@@ -77,7 +77,7 @@ export const getPatientTasks = async (req, res) => {
 
 export const createPatientTask = async (req, res) => {
   try {
-    
+
     const { description, scheduled_time, task_category } = req.body;
 
     if (!description) {
