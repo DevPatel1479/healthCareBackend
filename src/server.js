@@ -58,7 +58,10 @@ if (!process.env.VERCEL) {
   server.listen(PORT, '0.0.0.0', () => {
     console.log('Node time:', new Date());
     console.log(`Server running on port ${PORT}`);
-    startDailyTaskScheduler();
+    if (!process.env.VERCEL){
+      startDailyTaskScheduler();
+    }
+    
   });
 
   
