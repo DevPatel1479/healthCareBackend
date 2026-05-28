@@ -17,15 +17,15 @@ export const startDailyTaskScheduler = () => {
             // CHECK IF NEW DAY STARTED
             // =================================================
 
-            if (currentDate !== lastProcessedDate) {
+            // if (currentDate !== lastProcessedDate) {
 
-                console.log("New day detected. Regenerating tasks...");
+            console.log("New day detected. Regenerating tasks...");
 
-                // =============================================
-                // 1. MOVE COMPLETED TASKS TO HISTORY
-                // =============================================
+            // =============================================
+            // 1. MOVE COMPLETED TASKS TO HISTORY
+            // =============================================
 
-                await prisma.$executeRaw`
+            await prisma.$executeRaw`
 
                     INSERT IGNORE INTO completed_tasks (
                         task_id,
@@ -63,11 +63,11 @@ export const startDailyTaskScheduler = () => {
                       AND ta.status IN ('completed', 'skipped', 'refused')
                 `;
 
-                // =============================================
-                // 2. DELETE OLD DAILY TASKS
-                // =============================================
+            // =============================================
+            // 2. DELETE OLD DAILY TASKS
+            // =============================================
 
-                await prisma.$executeRaw`
+            await prisma.$executeRaw`
 
                     DELETE ta
 
@@ -79,11 +79,11 @@ export const startDailyTaskScheduler = () => {
                     WHERE ct.task_category = 'Daily/Routine'
                 `;
 
-                // =============================================
-                // 3. CREATE FRESH DAILY TASKS
-                // =============================================
+            // =============================================
+            // 3. CREATE FRESH DAILY TASKS
+            // =============================================
 
-                const generatedTasks = await prisma.$queryRaw`
+            const generatedTasks = await prisma.$queryRaw`
 
     SELECT
         ct.task_id,
@@ -99,65 +99,65 @@ export const startDailyTaskScheduler = () => {
 `;
 
 
-                // =============================================
-                // 4. INSERT FRESH DAILY TASKS
-                // =============================================
+            // =============================================
+            // 4. INSERT FRESH DAILY TASKS
+            // =============================================
 
-                await prisma.task_assignments.createMany({
+            await prisma.task_assignments.createMany({
 
-                    data: generatedTasks.map(task => ({
+                data: generatedTasks.map(task => ({
 
-                        task_id: task.task_id,
-                        patient_id: task.patient_id,
-                        caregiver_id: task.caregiver_id,
-                        shift_id: task.shift_id,
+                    task_id: task.task_id,
+                    patient_id: task.patient_id,
+                    caregiver_id: task.caregiver_id,
+                    shift_id: task.shift_id,
 
-                        status: "pending",
-                        time_done: null,
+                    status: "pending",
+                    time_done: null,
 
-                        flag_level: "green",
+                    flag_level: "green",
 
-                        observation: null,
-                        photo_evidence: null,
+                    observation: null,
+                    photo_evidence: null,
 
-                        supervisor_val: false
-                    }))
-                });
-                const caregiverIds = new Set();
-                const patientIds = new Set();
+                    supervisor_val: false
+                }))
+            });
+            const caregiverIds = new Set();
+            const patientIds = new Set();
 
-                for (const task of generatedTasks) {
+            for (const task of generatedTasks) {
 
-                    caregiverIds.add(task.caregiver_id);
-                    patientIds.add(task.patient_id);
-                }
-
-                // Notify caregivers
-                for (const caregiverId of caregiverIds) {
-
-                    io.to(`caregiver_${caregiverId}`).emit(
-                        "daily_tasks_regenerated",
-                        {
-                            message: "New daily tasks are available."
-                        }
-                    );
-                }
-                // Notify patients/family
-                for (const patientId of patientIds) {
-
-                    io.to(`patient_${patientId}`).emit(
-                        "daily_tasks_regenerated",
-                        {
-                            message: "Daily care tasks refreshed."
-                        }
-                    );
-                }
-                console.log("Websocket notifications sent.");
-                console.log("Daily tasks regenerated successfully.");
-
-                // UPDATE LAST DATE
-                lastProcessedDate = currentDate;
+                caregiverIds.add(task.caregiver_id);
+                patientIds.add(task.patient_id);
             }
+
+            // Notify caregivers
+            for (const caregiverId of caregiverIds) {
+
+                io.to(`caregiver_${caregiverId}`).emit(
+                    "daily_tasks_regenerated",
+                    {
+                        message: "New daily tasks are available."
+                    }
+                );
+            }
+            // Notify patients/family
+            for (const patientId of patientIds) {
+
+                io.to(`patient_${patientId}`).emit(
+                    "daily_tasks_regenerated",
+                    {
+                        message: "Daily care tasks refreshed."
+                    }
+                );
+            }
+            console.log("Websocket notifications sent.");
+            console.log("Daily tasks regenerated successfully.");
+
+            // UPDATE LAST DATE
+            lastProcessedDate = currentDate;
+            // }
 
         } catch (err) {
 
