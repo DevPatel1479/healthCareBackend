@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { io } from "../server.js";
 
 let lastProcessedDate = new Date().toDateString();
 
@@ -82,40 +83,76 @@ export const startDailyTaskScheduler = () => {
                 // 3. CREATE FRESH DAILY TASKS
                 // =============================================
 
-                await prisma.$executeRaw`
+                const generatedTasks = await prisma.$queryRaw`
 
-                    INSERT INTO task_assignments (
-                        task_id,
-                        patient_id,
-                        caregiver_id,
-                        shift_id,
-                        status,
-                        time_done,
-                        flag_level,
-                        observation,
-                        photo_evidence,
-                        supervisor_val
-                    )
+    SELECT
+        ct.task_id,
+        cs.patient_id,
+        cs.caregiver_id,
+        cs.shift_id
 
-                    SELECT
-                        ct.task_id,
-                        cs.patient_id,
-                        cs.caregiver_id,
-                        cs.shift_id,
-                        'pending',
-                        NULL,
-                        'green',
-                        NULL,
-                        NULL,
-                        0
+    FROM care_tasks ct
 
-                    FROM care_tasks ct
+    JOIN caregiver_shifts cs
 
-                    JOIN caregiver_shifts cs
+    WHERE ct.task_category = 'Daily/Routine'
+`;
 
-                    WHERE ct.task_category = 'Daily/Routine'
-                `;
 
+                // =============================================
+                // 4. INSERT FRESH DAILY TASKS
+                // =============================================
+
+                await prisma.task_assignments.createMany({
+
+                    data: generatedTasks.map(task => ({
+
+                        task_id: task.task_id,
+                        patient_id: task.patient_id,
+                        caregiver_id: task.caregiver_id,
+                        shift_id: task.shift_id,
+
+                        status: "pending",
+                        time_done: null,
+
+                        flag_level: "green",
+
+                        observation: null,
+                        photo_evidence: null,
+
+                        supervisor_val: false
+                    }))
+                });
+                const caregiverIds = new Set();
+                const patientIds = new Set();
+
+                for (const task of generatedTasks) {
+
+                    caregiverIds.add(task.caregiver_id);
+                    patientIds.add(task.patient_id);
+                }
+
+                // Notify caregivers
+                for (const caregiverId of caregiverIds) {
+
+                    io.to(`caregiver_${caregiverId}`).emit(
+                        "daily_tasks_regenerated",
+                        {
+                            message: "New daily tasks are available."
+                        }
+                    );
+                }
+                // Notify patients/family
+                for (const patientId of patientIds) {
+
+                    io.to(`patient_${patientId}`).emit(
+                        "daily_tasks_regenerated",
+                        {
+                            message: "Daily care tasks refreshed."
+                        }
+                    );
+                }
+                console.log("Websocket notifications sent.");
                 console.log("Daily tasks regenerated successfully.");
 
                 // UPDATE LAST DATE
