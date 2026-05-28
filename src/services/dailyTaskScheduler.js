@@ -169,5 +169,5 @@ export const startDailyTaskScheduler = () => {
 
         }
 
-    }, 5000); // every 2 minutes for testing
+    }, 15000); // every 2 minutes for testing
 };
