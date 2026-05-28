@@ -62,48 +62,47 @@ export const startDailyTaskScheduler = () => {
             // 3. DELETE OLD DAILY TASKS
             // =================================================
 
-            await prisma.$executeRaw`
+            await prisma.$transaction(async (tx) => {
 
-                DELETE ta
+                await tx.$executeRaw`
 
-                FROM task_assignments ta
+        DELETE ta
 
-                JOIN care_tasks ct
-                    ON ta.task_id = ct.task_id
+        FROM task_assignments ta
 
-                WHERE ct.task_category = 'Daily/Routine'
-            `;
+        JOIN care_tasks ct
+            ON ta.task_id = ct.task_id
 
-            // =================================================
-            // 4. REGENERATE SAME DAILY TASKS
-            // =================================================
+        WHERE ct.task_category = 'Daily/Routine'
+    `;
 
-            await prisma.task_assignments.createMany({
+                await tx.task_assignments.createMany({
 
-                data: oldDailyTasks.map(task => ({
+                    data: oldDailyTasks.map(task => ({
 
-                    task_id: task.task_id,
+                        task_id: task.task_id,
 
-                    patient_id: task.patient_id,
+                        patient_id: task.patient_id,
 
-                    caregiver_id: task.caregiver_id,
+                        caregiver_id: task.caregiver_id,
 
-                    shift_id: task.shift_id,
+                        shift_id: task.shift_id,
 
-                    status: "pending",
+                        status: "pending",
 
-                    time_done: null,
+                        time_done: null,
 
-                    flag_level: "green",
+                        flag_level: "green",
 
-                    observation: null,
+                        observation: null,
 
-                    photo_evidence: null,
+                        photo_evidence: null,
 
-                    supervisor_val: false
-                }))
+                        supervisor_val: false
+                    }))
+                });
+
             });
-
             // =================================================
             // 5. SEND WEBSOCKET NOTIFICATIONS
             // =================================================
