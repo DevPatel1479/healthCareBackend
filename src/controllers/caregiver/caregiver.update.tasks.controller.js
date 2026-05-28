@@ -61,6 +61,53 @@ export const updateTaskStatus = async (req, res) => {
         care_tasks: true, // 🔥 include for frontend
       },
     });
+    if (
+      status === "completed" ||
+      status === "skipped" ||
+      status === "refused"
+    ) {
+
+      // prevent duplicate history entries
+      const existingCompleted =
+        await prisma.completed_tasks.findFirst({
+          where: {
+            assignment_id: updatedTask.assignment_id,
+          },
+        });
+
+      if (!existingCompleted) {
+
+        await prisma.completed_tasks.create({
+          data: {
+            task_id: updatedTask.task_id,
+
+            patient_id: updatedTask.patient_id,
+
+            caregiver_id: updatedTask.caregiver_id,
+
+            shift_id: updatedTask.shift_id,
+
+            assignment_id: updatedTask.assignment_id,
+
+            // scheduled_time in your schema is DateTime
+            // but task scheduled_time is string
+            // so store null OR convert properly
+            scheduled_time: null,
+
+            actual_time_done: updatedTask.time_done,
+
+            status: status,
+
+            flag_level: updatedTask.flag_level,
+
+            observation: updatedTask.observation,
+
+            photo_evidence:
+              updatedTask.photo_evidence,
+          },
+        });
+      }
+    }
 
     // 🔥 IMPORTANT: Emit ONLY AFTER SUCCESS
     io.to(`caregiver_${caregiver_id}`).emit("task_updated", {
