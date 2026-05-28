@@ -48,60 +48,67 @@ export const updateTaskStatus = async (req, res) => {
     const nowIST = new Date(
       new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
     );
-    // 🔹 Update task
-    const updatedTask = await prisma.task_assignments.update({
-      where: { assignment_id },
-      data: {
-        status,
-        observation: observation ?? null,
-        photo_evidence: photo_evidence ?? null,
-        time_done: nowIST
-      },
-      include: {
-        care_tasks: true, // 🔥 include for frontend
-      },
-    });
-    if (
-      status === "completed" ||
-      status === "skipped" ||
-      status === "refused"
-    ) {
 
-      await prisma.completed_tasks.upsert({
-        where: {
-          assignment_id: updatedTask.assignment_id,
+    const updatedTask = await prisma.$transaction(async (tx) => {
+      // 🔹 Update task
+      const updatedTask = await tx.task_assignments.update({
+        where: { assignment_id },
+        data: {
+          status,
+          observation: observation ?? null,
+          photo_evidence: photo_evidence ?? null,
+          time_done: nowIST
         },
-
-        update: {
-          status: status,
-          actual_time_done: updatedTask.time_done,
-          observation: updatedTask.observation,
-          photo_evidence: updatedTask.photo_evidence,
-          flag_level: updatedTask.flag_level,
-        },
-
-        create: {
-          task_id: updatedTask.task_id,
-          patient_id: updatedTask.patient_id,
-          caregiver_id: updatedTask.caregiver_id,
-          shift_id: updatedTask.shift_id,
-          assignment_id: updatedTask.assignment_id,
-
-          scheduled_time: null,
-
-          actual_time_done: updatedTask.time_done,
-
-          status: status,
-
-          flag_level: updatedTask.flag_level,
-
-          observation: updatedTask.observation,
-
-          photo_evidence: updatedTask.photo_evidence,
+        include: {
+          care_tasks: true, // 🔥 include for frontend
         },
       });
+      if (
+        status === "completed" ||
+        status === "skipped" ||
+        status === "refused"
+      ) {
 
-    }
+        await tx.completed_tasks.upsert({
+          where: {
+            assignment_id: updatedTask.assignment_id,
+          },
+
+          update: {
+            status: status,
+            actual_time_done: updatedTask.time_done,
+            observation: updatedTask.observation,
+            photo_evidence: updatedTask.photo_evidence,
+            flag_level: updatedTask.flag_level,
+          },
+
+          create: {
+            task_id: updatedTask.task_id,
+            patient_id: updatedTask.patient_id,
+            caregiver_id: updatedTask.caregiver_id,
+            shift_id: updatedTask.shift_id,
+            assignment_id: updatedTask.assignment_id,
+
+            scheduled_time: null,
+
+            actual_time_done: updatedTask.time_done,
+
+            status: status,
+
+            flag_level: updatedTask.flag_level,
+
+            observation: updatedTask.observation,
+
+            photo_evidence: updatedTask.photo_evidence,
+          },
+
+        });
+      }
+      return updatedTask;
+    });
+
+
+
     // 🔥 IMPORTANT: Emit ONLY AFTER SUCCESS
     io.to(`caregiver_${caregiver_id}`).emit("task_updated", {
       assignment_id: updatedTask.assignment_id,
