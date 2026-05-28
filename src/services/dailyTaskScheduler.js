@@ -2,13 +2,19 @@ import prisma from "../lib/prisma.js";
 import { io } from "../server.js";
 
 let lastProcessedDate = new Date().toDateString();
-
+let isSchedulerRunning = false;
 export const startDailyTaskScheduler = () => {
 
     console.log("Daily task scheduler started...");
 
     setInterval(async () => {
+        if (isSchedulerRunning) {
 
+            console.log("Scheduler already running...");
+            return;
+        }
+
+        isSchedulerRunning = true;
         try {
 
             const currentDate = new Date().toDateString();
@@ -180,6 +186,10 @@ export const startDailyTaskScheduler = () => {
         } catch (err) {
 
             console.error("Scheduler Error:", err);
+        } finally {
+
+            isSchedulerRunning = false;
+
         }
 
     }, 120000); // every 2 minutes for testing
