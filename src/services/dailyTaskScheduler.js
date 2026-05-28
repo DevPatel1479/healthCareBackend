@@ -1,7 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { io } from "../server.js";
 
-let lastProcessedDate = new Date().toDateString();
+
 
 let isSchedulerRunning = false;
 export const startDailyTaskScheduler = () => {
@@ -19,18 +19,47 @@ export const startDailyTaskScheduler = () => {
         try {
 
             const currentDate = new Date().toDateString();
-            if (currentDate === lastProcessedDate) {
+            let schedulerState =
+                await prisma.scheduler_state.findUnique({
+                    where: {
+                        id: 1
+                    }
+                });
+            if (!schedulerState) {
 
-                console.log("Same day detected. No regeneration needed.");
-                isSchedulerRunning = false;
+                schedulerState =
+                    await prisma.scheduler_state.create({
+                        data: {
+                            id: 1,
+                            last_processed_date: currentDate
+                        }
+                    });
+
+                console.log(
+                    "Scheduler state initialized."
+                );
+
                 return;
             }
+
+            if (
+                schedulerState.last_processed_date ===
+                currentDate
+            ) {
+
+                console.log(
+                    "Same day detected. No regeneration needed."
+                );
+
+                return;
+            }
+
 
             // =================================================
             // ENABLE THIS IN PRODUCTION
             // =================================================
 
-            // if (currentDate !== lastProcessedDate) {
+            
 
             console.log("New day detected. Regenerating tasks...");
 
@@ -71,17 +100,27 @@ export const startDailyTaskScheduler = () => {
 
             await prisma.$transaction(async (tx) => {
 
+                await tx.scheduler_state.update({
+                    where: {
+                        id: 1
+                    },
+
+                    data: {
+                        last_processed_date: currentDate
+                    }
+                });
+
                 await tx.$executeRaw`
 
-        DELETE ta
+                    DELETE ta
 
-        FROM task_assignments ta
+                    FROM task_assignments ta
 
-        JOIN care_tasks ct
-            ON ta.task_id = ct.task_id
+                    JOIN care_tasks ct
+                    ON ta.task_id = ct.task_id
 
-        WHERE ct.task_category = 'Daily/Routine'
-    `;
+                    WHERE ct.task_category = 'Daily/Routine'
+                `;
 
                 await tx.task_assignments.createMany({
 
@@ -156,7 +195,7 @@ export const startDailyTaskScheduler = () => {
 
             console.log("Daily tasks regenerated successfully.");
 
-            lastProcessedDate = currentDate;
+            
 
             // }
 
