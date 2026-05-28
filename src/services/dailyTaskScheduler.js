@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import { io } from "../server.js";
 
 let lastProcessedDate = new Date().toDateString();
+
 let isSchedulerRunning = false;
 export const startDailyTaskScheduler = () => {
 
@@ -18,6 +19,12 @@ export const startDailyTaskScheduler = () => {
         try {
 
             const currentDate = new Date().toDateString();
+            if (currentDate === lastProcessedDate) {
+
+                console.log("Same day detected. No regeneration needed.");
+                isSchedulerRunning = false;
+                return;
+            }
 
             // =================================================
             // ENABLE THIS IN PRODUCTION
@@ -112,9 +119,13 @@ export const startDailyTaskScheduler = () => {
 
             for (const task of oldDailyTasks) {
 
-                caregiverIds.add(task.caregiver_id);
+                if (task.caregiver_id) {
+                    caregiverIds.add(task.caregiver_id);
+                }
 
-                patientIds.add(task.patient_id);
+                if (task.patient_id) {
+                    patientIds.add(task.patient_id);
+                }
             }
 
             // Notify caregivers
@@ -158,5 +169,5 @@ export const startDailyTaskScheduler = () => {
 
         }
 
-    }, 300000); // every 2 minutes for testing
+    }, 5000); // every 2 minutes for testing
 };

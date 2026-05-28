@@ -14,10 +14,10 @@ export const getCaregiverOverallReport = async (req, res) => {
         const startDate = new Date(`${start_date}T00:00:00`);
         const endDate = new Date(`${end_date}T23:59:59`);
 
-        const assignments = await prisma.task_assignments.findMany({
+        const assignments = await prisma.completed_tasks.findMany({
             where: {
                 caregiver_id: Number(caregiver_id),
-                time_done: {
+                actual_time_done: {
                     gte: startDate,
                     lte: endDate,
                 },
@@ -56,14 +56,19 @@ export const getCaregiverOverallReport = async (req, res) => {
             },
 
             orderBy: {
-                time_done: "desc",
+                actual_time_done: "desc",
             },
         });
 
         const report = assignments.map((task) => ({
-            assignment_id: task.assignment_id,
+            completed_task_id:
+                task.completed_task_id,
+            assignment_id:
+                task.assignment_id,
 
-            completed_at: task.time_done,
+            completed_at:
+                task.actual_time_done,
+
 
             status: task.status,
 
@@ -144,11 +149,11 @@ export const getCaregiverPatientWiseReport = async (req, res) => {
         const startDate = new Date(`${start_date}T00:00:00`);
         const endDate = new Date(`${end_date}T23:59:59`);
 
-        const assignments = await prisma.task_assignments.findMany({
+        const assignments = await prisma.completed_tasks.findMany({
             where: {
                 caregiver_id: Number(caregiver_id),
 
-                time_done: {
+                actual_time_done: {
                     gte: startDate,
                     lte: endDate,
                 },
@@ -188,9 +193,12 @@ export const getCaregiverPatientWiseReport = async (req, res) => {
             }
 
             groupedReport[patientId].tasks.push({
+                completed_task_id:
+                    task.completed_task_id,
+
                 assignment_id: task.assignment_id,
 
-                completed_at: task.time_done,
+                completed_at: task.actual_time_done,
 
                 status: task.status,
 
@@ -204,6 +212,8 @@ export const getCaregiverPatientWiseReport = async (req, res) => {
 
                         task_category:
                             task.care_tasks.task_category,
+                        scheduled_time:
+                            task.care_tasks.scheduled_time,
                     }
                     : null,
             });
