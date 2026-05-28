@@ -4,26 +4,35 @@ import { io } from "../server.js";
 /**
  * Get today in IST (safe + consistent)
  */
-function getISTDate() {
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).format(new Date());
+
+function getISTDateTime() {
+    const now = new Date();
+
+    // convert to IST date-only safely
+    const istDate = new Date(
+        now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    );
+
+    // normalize to YYYY-MM-DD (midnight)
+    istDate.setHours(0, 0, 0, 0);
+
+    return istDate;
 }
+
 
 /**
  * Main job
  */
 async function runDailyJob() {
-    const today = getISTDate();
+    const today = getISTDateTime();
 
     // 🔥 ATOMIC LOCK (prevents double execution)
     const lock = await prisma.scheduler_state.updateMany({
         where: {
             id: 1,
-            last_processed_date: { not: today },
+            last_processed_date: {
+                not: today
+            }
         },
         data: {
             last_processed_date: today,
