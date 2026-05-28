@@ -57,39 +57,6 @@ export const startDailyTaskScheduler = () => {
             // 2. MOVE COMPLETED TASKS TO HISTORY
             // =================================================
 
-            const completedHistoryTasks = oldDailyTasks.filter(
-                task =>
-                    task.status === "completed" ||
-                    task.status === "skipped" ||
-                    task.status === "refused"
-            );
-
-            if (completedHistoryTasks.length > 0) {
-
-                await prisma.completed_tasks.createMany({
-
-                    data: completedHistoryTasks.map(task => ({
-
-                        task_id: task.task_id,
-                        patient_id: task.patient_id,
-                        caregiver_id: task.caregiver_id,
-                        shift_id: task.shift_id,
-                        assignment_id: task.assignment_id,
-
-                        scheduled_time: null,
-
-                        actual_time_done: task.time_done,
-
-                        status: task.status,
-
-                        flag_level: task.flag_level,
-
-                        observation: task.observation,
-
-                        photo_evidence: task.photo_evidence
-                    }))
-                });
-            }
 
             // =================================================
             // 3. DELETE OLD DAILY TASKS
