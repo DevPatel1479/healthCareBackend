@@ -1,5 +1,5 @@
 import express from "express";
-import { generateDailyTasks } from "../controllers/daily_tasks_cron_job/cron.job.controller";
+import { generateDailyTasks } from "../controllers/daily_tasks_cron_job/cron.job.controller.js";
 
 const router = express.Router();
 
