@@ -1,5 +1,5 @@
 import app from './app.js'
-import { startDailyTaskScheduler } from "./services/dailyTaskScheduler.js";
+
 // import dotenv from 'dotenv'
 
 // dotenv.config()
@@ -55,10 +55,14 @@ if (!process.env.VERCEL) {
     });
   });
 
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', async () => {
     console.log('Node time:', new Date());
     console.log(`Server running on port ${PORT}`);
     if (!process.env.VERCEL){
+      const { startDailyTaskScheduler } = await import(
+      "./services/dailyTaskScheduler.js"
+    );
+
       startDailyTaskScheduler();
     }
     

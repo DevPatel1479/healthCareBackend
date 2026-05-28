@@ -1,212 +1,125 @@
 import prisma from "../lib/prisma.js";
 import { io } from "../server.js";
 
+/**
+ * Get today in IST (safe + consistent)
+ */
+function getISTDate() {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(new Date());
+}
 
+/**
+ * Main job
+ */
+async function runDailyJob() {
+    const today = getISTDate();
 
-let isSchedulerRunning = false;
+    // 🔥 ATOMIC LOCK (prevents double execution)
+    const lock = await prisma.scheduler_state.updateMany({
+        where: {
+            id: 1,
+            last_processed_date: { not: today },
+        },
+        data: {
+            last_processed_date: today,
+        },
+    });
+
+    if (lock.count === 0) {
+        console.log("⛔ Already processed today. Skipping...");
+        return;
+    }
+
+    console.log("🚀 New day detected. Running scheduler...");
+
+    const oldDailyTasks = await prisma.$queryRaw`
+    SELECT
+      ta.assignment_id,
+      ta.task_id,
+      ta.patient_id,
+      ta.caregiver_id,
+      ta.shift_id,
+      ta.status,
+      ta.time_done,
+      ta.flag_level,
+      ta.observation,
+      ta.photo_evidence
+    FROM task_assignments ta
+    JOIN care_tasks ct ON ta.task_id = ct.task_id
+    WHERE ct.task_category = 'Daily/Routine'
+  `;
+
+    if (!oldDailyTasks.length) {
+        console.log("⚠️ No tasks found.");
+        return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+        // 🔥 1. DELETE OLD DAILY TASKS
+        await tx.$executeRaw`
+      DELETE ta
+      FROM task_assignments ta
+      JOIN care_tasks ct ON ta.task_id = ct.task_id
+      WHERE ct.task_category = 'Daily/Routine'
+    `;
+
+        // 🔥 2. RECREATE FRESH TASKS
+        await tx.task_assignments.createMany({
+            data: oldDailyTasks.map((t) => ({
+                task_id: t.task_id,
+                patient_id: t.patient_id,
+                caregiver_id: t.caregiver_id,
+                shift_id: t.shift_id,
+                status: "pending",
+                time_done: null,
+                flag_level: "green",
+                observation: null,
+                photo_evidence: null,
+                supervisor_val: false,
+            })),
+        });
+    });
+
+    // 🔥 SOCKET NOTIFICATIONS
+    const caregivers = new Set();
+    const patients = new Set();
+
+    for (const t of oldDailyTasks) {
+        if (t.caregiver_id) caregivers.add(t.caregiver_id);
+        if (t.patient_id) patients.add(t.patient_id);
+    }
+
+    caregivers.forEach((id) =>
+        io.to(`caregiver_${id}`).emit("daily_tasks_regenerated", {
+            message: "New daily tasks available",
+        })
+    );
+
+    patients.forEach((id) =>
+        io.to(`patient_${id}`).emit("daily_tasks_regenerated", {
+            message: "Daily tasks refreshed",
+        })
+    );
+
+    console.log("✅ Scheduler completed successfully");
+}
+
+/**
+ * Scheduler loop (production-safe)
+ */
 export const startDailyTaskScheduler = () => {
-
-    console.log("Daily task scheduler started...");
+    console.log("🟢 Scheduler started");
 
     setInterval(async () => {
-        if (isSchedulerRunning) {
-
-            console.log("Scheduler already running...");
-            return;
-        }
-
-        isSchedulerRunning = true;
         try {
-
-            const currentDate = new Date().toDateString();
-            let schedulerState =
-                await prisma.scheduler_state.findUnique({
-                    where: {
-                        id: 1
-                    }
-                });
-            if (!schedulerState) {
-
-                schedulerState =
-                    await prisma.scheduler_state.create({
-                        data: {
-                            id: 1,
-                            last_processed_date: currentDate
-                        }
-                    });
-
-                console.log(
-                    "Scheduler state initialized."
-                );
-
-                return;
-            }
-
-            if (
-                schedulerState.last_processed_date ===
-                currentDate
-            ) {
-
-                console.log(
-                    "Same day detected. No regeneration needed."
-                );
-
-                return;
-            }
-
-
-            // =================================================
-            // ENABLE THIS IN PRODUCTION
-            // =================================================
-
-            
-
-            console.log("New day detected. Regenerating tasks...");
-
-            // =================================================
-            // 1. GET OLD DAILY TASK ASSIGNMENTS
-            // =================================================
-
-            const oldDailyTasks = await prisma.$queryRaw`
-
-                SELECT
-                    ta.assignment_id,
-                    ta.task_id,
-                    ta.patient_id,
-                    ta.caregiver_id,
-                    ta.shift_id,
-                    ta.status,
-                    ta.time_done,
-                    ta.flag_level,
-                    ta.observation,
-                    ta.photo_evidence
-
-                FROM task_assignments ta
-
-                JOIN care_tasks ct
-                    ON ta.task_id = ct.task_id
-
-                WHERE ct.task_category = 'Daily/Routine'
-            `;
-
-            // =================================================
-            // 2. MOVE COMPLETED TASKS TO HISTORY
-            // =================================================
-
-
-            // =================================================
-            // 3. DELETE OLD DAILY TASKS
-            // =================================================
-
-            await prisma.$transaction(async (tx) => {
-
-                await tx.scheduler_state.update({
-                    where: {
-                        id: 1
-                    },
-
-                    data: {
-                        last_processed_date: currentDate
-                    }
-                });
-
-                await tx.$executeRaw`
-
-                    DELETE ta
-
-                    FROM task_assignments ta
-
-                    JOIN care_tasks ct
-                    ON ta.task_id = ct.task_id
-
-                    WHERE ct.task_category = 'Daily/Routine'
-                `;
-
-                await tx.task_assignments.createMany({
-
-                    data: oldDailyTasks.map(task => ({
-
-                        task_id: task.task_id,
-
-                        patient_id: task.patient_id,
-
-                        caregiver_id: task.caregiver_id,
-
-                        shift_id: task.shift_id,
-
-                        status: "pending",
-
-                        time_done: null,
-
-                        flag_level: "green",
-
-                        observation: null,
-
-                        photo_evidence: null,
-
-                        supervisor_val: false
-                    }))
-                });
-
-            });
-            // =================================================
-            // 5. SEND WEBSOCKET NOTIFICATIONS
-            // =================================================
-
-            const caregiverIds = new Set();
-            const patientIds = new Set();
-
-            for (const task of oldDailyTasks) {
-
-                if (task.caregiver_id) {
-                    caregiverIds.add(task.caregiver_id);
-                }
-
-                if (task.patient_id) {
-                    patientIds.add(task.patient_id);
-                }
-            }
-
-            // Notify caregivers
-
-            for (const caregiverId of caregiverIds) {
-
-                io.to(`caregiver_${caregiverId}`).emit(
-                    "daily_tasks_regenerated",
-                    {
-                        message: "New daily tasks are available."
-                    }
-                );
-            }
-
-            // Notify patients
-
-            for (const patientId of patientIds) {
-
-                io.to(`patient_${patientId}`).emit(
-                    "daily_tasks_regenerated",
-                    {
-                        message: "Daily care tasks refreshed."
-                    }
-                );
-            }
-
-            console.log("Websocket notifications sent.");
-
-            console.log("Daily tasks regenerated successfully.");
-
-            
-
-            // }
-
+            await runDailyJob();
         } catch (err) {
-
-            console.error("Scheduler Error:", err);
-        } finally {
-
-            isSchedulerRunning = false;
-
+            console.error("❌ Scheduler error:", err);
         }
-
-    }, 10000); // every 2 minutes for testing
+    }, 10 * 1000); // 1 minute safe polling
 };
