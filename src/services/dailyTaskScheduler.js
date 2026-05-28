@@ -14,125 +14,139 @@ export const startDailyTaskScheduler = () => {
             const currentDate = new Date().toDateString();
 
             // =================================================
-            // CHECK IF NEW DAY STARTED
+            // ENABLE THIS IN PRODUCTION
             // =================================================
 
             // if (currentDate !== lastProcessedDate) {
 
             console.log("New day detected. Regenerating tasks...");
 
-            // =============================================
-            // 1. MOVE COMPLETED TASKS TO HISTORY
-            // =============================================
+            // =================================================
+            // 1. GET OLD DAILY TASK ASSIGNMENTS
+            // =================================================
+
+            const oldDailyTasks = await prisma.$queryRaw`
+
+                SELECT
+                    ta.assignment_id,
+                    ta.task_id,
+                    ta.patient_id,
+                    ta.caregiver_id,
+                    ta.shift_id,
+                    ta.status,
+                    ta.time_done,
+                    ta.flag_level,
+                    ta.observation,
+                    ta.photo_evidence
+
+                FROM task_assignments ta
+
+                JOIN care_tasks ct
+                    ON ta.task_id = ct.task_id
+
+                WHERE ct.task_category = 'Daily/Routine'
+            `;
+
+            // =================================================
+            // 2. MOVE COMPLETED TASKS TO HISTORY
+            // =================================================
+
+            const completedHistoryTasks = oldDailyTasks.filter(
+                task =>
+                    task.status === "completed" ||
+                    task.status === "skipped" ||
+                    task.status === "refused"
+            );
+
+            if (completedHistoryTasks.length > 0) {
+
+                await prisma.completed_tasks.createMany({
+
+                    data: completedHistoryTasks.map(task => ({
+
+                        task_id: task.task_id,
+                        patient_id: task.patient_id,
+                        caregiver_id: task.caregiver_id,
+                        shift_id: task.shift_id,
+                        assignment_id: task.assignment_id,
+
+                        scheduled_time: null,
+
+                        actual_time_done: task.time_done,
+
+                        status: task.status,
+
+                        flag_level: task.flag_level,
+
+                        observation: task.observation,
+
+                        photo_evidence: task.photo_evidence
+                    }))
+                });
+            }
+
+            // =================================================
+            // 3. DELETE OLD DAILY TASKS
+            // =================================================
 
             await prisma.$executeRaw`
 
-                    INSERT IGNORE INTO completed_tasks (
-                        task_id,
-                        patient_id,
-                        caregiver_id,
-                        shift_id,
-                        assignment_id,
-                        scheduled_time,
-                        actual_time_done,
-                        status,
-                        flag_level,
-                        observation,
-                        photo_evidence
-                    )
+                DELETE ta
 
-                    SELECT
-                        ta.task_id,
-                        ta.patient_id,
-                        ta.caregiver_id,
-                        ta.shift_id,
-                        ta.assignment_id,
-                        NULL,
-                        ta.time_done,
-                        ta.status,
-                        ta.flag_level,
-                        ta.observation,
-                        ta.photo_evidence
+                FROM task_assignments ta
 
-                    FROM task_assignments ta
+                JOIN care_tasks ct
+                    ON ta.task_id = ct.task_id
 
-                    JOIN care_tasks ct
-                      ON ta.task_id = ct.task_id
+                WHERE ct.task_category = 'Daily/Routine'
+            `;
 
-                    WHERE ct.task_category = 'Daily/Routine'
-                      AND ta.status IN ('completed', 'skipped', 'refused')
-                `;
-
-            // =============================================
-            // 2. DELETE OLD DAILY TASKS
-            // =============================================
-
-            await prisma.$executeRaw`
-
-                    DELETE ta
-
-                    FROM task_assignments ta
-
-                    JOIN care_tasks ct
-                      ON ta.task_id = ct.task_id
-
-                    WHERE ct.task_category = 'Daily/Routine'
-                `;
-
-            // =============================================
-            // 3. CREATE FRESH DAILY TASKS
-            // =============================================
-
-            const generatedTasks = await prisma.$queryRaw`
-
-    SELECT
-        ct.task_id,
-        cs.patient_id,
-        cs.caregiver_id,
-        cs.shift_id
-
-    FROM care_tasks ct
-
-    JOIN caregiver_shifts cs
-
-    WHERE ct.task_category = 'Daily/Routine'
-`;
-
-
-            // =============================================
-            // 4. INSERT FRESH DAILY TASKS
-            // =============================================
+            // =================================================
+            // 4. REGENERATE SAME DAILY TASKS
+            // =================================================
 
             await prisma.task_assignments.createMany({
 
-                data: generatedTasks.map(task => ({
+                data: oldDailyTasks.map(task => ({
 
                     task_id: task.task_id,
+
                     patient_id: task.patient_id,
+
                     caregiver_id: task.caregiver_id,
+
                     shift_id: task.shift_id,
 
                     status: "pending",
+
                     time_done: null,
 
                     flag_level: "green",
 
                     observation: null,
+
                     photo_evidence: null,
 
                     supervisor_val: false
                 }))
             });
+
+            // =================================================
+            // 5. SEND WEBSOCKET NOTIFICATIONS
+            // =================================================
+
             const caregiverIds = new Set();
             const patientIds = new Set();
 
-            for (const task of generatedTasks) {
+            for (const task of oldDailyTasks) {
 
                 caregiverIds.add(task.caregiver_id);
+
                 patientIds.add(task.patient_id);
             }
 
             // Notify caregivers
+
             for (const caregiverId of caregiverIds) {
 
                 io.to(`caregiver_${caregiverId}`).emit(
@@ -142,7 +156,9 @@ export const startDailyTaskScheduler = () => {
                     }
                 );
             }
-            // Notify patients/family
+
+            // Notify patients
+
             for (const patientId of patientIds) {
 
                 io.to(`patient_${patientId}`).emit(
@@ -152,11 +168,13 @@ export const startDailyTaskScheduler = () => {
                     }
                 );
             }
+
             console.log("Websocket notifications sent.");
+
             console.log("Daily tasks regenerated successfully.");
 
-            // UPDATE LAST DATE
             lastProcessedDate = currentDate;
+
             // }
 
         } catch (err) {
@@ -164,5 +182,5 @@ export const startDailyTaskScheduler = () => {
             console.error("Scheduler Error:", err);
         }
 
-    }, 5000); // every 5 seconds
+    }, 120000); // every 2 minutes for testing
 };
