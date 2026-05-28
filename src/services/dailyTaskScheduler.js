@@ -19,12 +19,12 @@ export const startDailyTaskScheduler = () => {
         try {
 
             const currentDate = new Date().toDateString();
-            // if (currentDate === lastProcessedDate) {
+            if (currentDate === lastProcessedDate) {
 
-            //     console.log("Same day detected. No regeneration needed.");
-            //     isSchedulerRunning = false;
-            //     return;
-            // }
+                console.log("Same day detected. No regeneration needed.");
+                isSchedulerRunning = false;
+                return;
+            }
 
             // =================================================
             // ENABLE THIS IN PRODUCTION
@@ -169,5 +169,5 @@ export const startDailyTaskScheduler = () => {
 
         }
 
-    }, 15000); // every 2 minutes for testing
+    }, 10000); // every 2 minutes for testing
 };
