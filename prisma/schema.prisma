@@ -183,7 +183,7 @@ model completed_tasks {
   patient_id    Int?
   caregiver_id  Int?
   shift_id      Int?
-  assignment_id Int?
+  assignment_id Int? @unique
 
   scheduled_time   DateTime? @db.Timestamp(0)
   actual_time_done DateTime? @db.Timestamp(0)

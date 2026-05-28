@@ -67,48 +67,41 @@ export const updateTaskStatus = async (req, res) => {
       status === "refused"
     ) {
 
-      // prevent duplicate history entries
-      const existingCompleted =
-        await prisma.completed_tasks.findFirst({
-          where: {
-            assignment_id: updatedTask.assignment_id,
-          },
-        });
+      await prisma.completed_tasks.upsert({
+        where: {
+          assignment_id: updatedTask.assignment_id,
+        },
 
-      if (!existingCompleted) {
+        update: {
+          status: status,
+          actual_time_done: updatedTask.time_done,
+          observation: updatedTask.observation,
+          photo_evidence: updatedTask.photo_evidence,
+          flag_level: updatedTask.flag_level,
+        },
 
-        await prisma.completed_tasks.create({
-          data: {
-            task_id: updatedTask.task_id,
+        create: {
+          task_id: updatedTask.task_id,
+          patient_id: updatedTask.patient_id,
+          caregiver_id: updatedTask.caregiver_id,
+          shift_id: updatedTask.shift_id,
+          assignment_id: updatedTask.assignment_id,
 
-            patient_id: updatedTask.patient_id,
+          scheduled_time: null,
 
-            caregiver_id: updatedTask.caregiver_id,
+          actual_time_done: updatedTask.time_done,
 
-            shift_id: updatedTask.shift_id,
+          status: status,
 
-            assignment_id: updatedTask.assignment_id,
+          flag_level: updatedTask.flag_level,
 
-            // scheduled_time in your schema is DateTime
-            // but task scheduled_time is string
-            // so store null OR convert properly
-            scheduled_time: null,
+          observation: updatedTask.observation,
 
-            actual_time_done: updatedTask.time_done,
+          photo_evidence: updatedTask.photo_evidence,
+        },
+      });
 
-            status: status,
-
-            flag_level: updatedTask.flag_level,
-
-            observation: updatedTask.observation,
-
-            photo_evidence:
-              updatedTask.photo_evidence,
-          },
-        });
-      }
     }
-
     // 🔥 IMPORTANT: Emit ONLY AFTER SUCCESS
     io.to(`caregiver_${caregiver_id}`).emit("task_updated", {
       assignment_id: updatedTask.assignment_id,
