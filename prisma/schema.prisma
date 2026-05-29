@@ -59,6 +59,7 @@ model caregiver_shifts {
   @@index([patient_id])
   @@index([caregiver_id])
   @@index([shift_id])
+  @@index([patient_id, end_time, verified])
 }
 
 model patients {
