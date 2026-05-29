@@ -30,9 +30,9 @@ export const sendOTP = async (req, res) => {
       });
     }
 
-    const otp = generateOTP();
+    // const otp = generateOTP();
 
-    await saveOTP(phone, otp);
+    const otp = await saveOTP(phone);
 
     let apiUrl = '';
 
@@ -52,7 +52,7 @@ export const sendOTP = async (req, res) => {
 
     // Call API
     await axios.get(apiUrl, { timeout: 5000 });
-    
+
     return res.status(200).json({
       success: true,
       message: `OTP sent via ${type}`,
