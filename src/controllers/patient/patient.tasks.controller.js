@@ -2,40 +2,177 @@
 
 import prisma from "../../lib/prisma.js";
 import { io } from "../../server.js";
-import { assignTaskToCaregiver } from "../task_assignment/assign.task.controller.js";
+// import { assignTaskToCaregiver } from "../task_assignment/assign.task.controller.js";
+
+// export const getPatientTasks = async (req, res) => {
+//   try {
+//     const patientId = parseInt(req.params.id); // ✅ dynamic
+
+//     const assignments = await prisma.task_assignments.findMany({
+//       where: {
+//         patient_id: patientId,
+//       },
+//       include: {
+//         care_tasks: true,
+//         users: {
+//           select: {
+//             full_name: true,
+//             phone_number: true,
+//           },
+//         },
+//         patients: {
+//           include: {
+//             users: {
+//               select: {
+//                 full_name: true,
+//               },
+//             },
+//           },
+
+//         },
+//       },
+
+//     });
+//     const activeCaregiverShift =
+//       await prisma.caregiver_shifts.findFirst({
+
+//         where: {
+//           patient_id: patientId,
+//           verified: true,
+//         },
+
+//         orderBy: {
+//           start_time: "desc",
+//         },
+
+//         include: {
+//           users: {
+//             select: {
+//               full_name: true,
+//               phone_number: true,
+//             },
+//           },
+
+//           shifts: true,
+//         },
+//       });
+
+//     const result = assignments.map((a) => ({
+//       assignment_id: a.assignment_id,
+//       status: a.status,
+//       time_done: a.time_done,
+//       flag_level: a.flag_level,
+//       observation: a.observation,
+
+//       task: a.care_tasks,
+
+//       patient: a.patients?.users
+//         ? {
+//           name: a.patients.users.full_name,
+//         }
+//         : null,
+//     }));
+
+//     return res.json({
+//       success: true,
+
+//       caregiver: activeCaregiverShift?.users
+//         ? {
+//           name: activeCaregiverShift.users.full_name,
+//           phone: activeCaregiverShift.users.phone_number,
+//           shift: activeCaregiverShift.shifts?.shift_name,
+//         }
+//         : null,
+
+//       data: result,
+//     });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     });
+//   }
+// };
+
+
 
 export const getPatientTasks = async (req, res) => {
   try {
-    const patientId = parseInt(req.params.id); // ✅ dynamic
+    const patientId = Number(req.params.id);
 
-    const assignments = await prisma.task_assignments.findMany({
-      where: {
-        patient_id: patientId,
-      },
-      include: {
-        care_tasks: true,
-        users: {
-          select: {
-            full_name: true,
-            phone_number: true,
-          },
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid patient id",
+      });
+    }
+
+    // IST date boundaries
+    const nowIST = new Date(
+      new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+      })
+    );
+
+    const startOfDay = new Date(nowIST);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(nowIST);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const [
+      assignments,
+      completedToday,
+      activeCaregiverShift,
+    ] = await Promise.all([
+
+      prisma.task_assignments.findMany({
+        where: {
+          patient_id: patientId,
         },
-        patients: {
-          include: {
-            users: {
-              select: {
-                full_name: true,
+
+        include: {
+          care_tasks: true,
+
+          patients: {
+            include: {
+              users: {
+                select: {
+                  full_name: true,
+                },
               },
             },
           },
-
         },
-      },
 
-    });
-    const activeCaregiverShift =
-      await prisma.caregiver_shifts.findFirst({
+        orderBy: {
+          assignment_id: "asc",
+        },
+      }),
 
+      prisma.completed_tasks.findMany({
+        where: {
+          patient_id: patientId,
+
+          actual_time_done: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+
+        select: {
+          task_id: true,
+          status: true,
+          actual_time_done: true,
+          flag_level: true,
+          observation: true,
+          photo_evidence: true,
+        },
+      }),
+
+      prisma.caregiver_shifts.findFirst({
         where: {
           patient_id: patientId,
           verified: true,
@@ -55,32 +192,70 @@ export const getPatientTasks = async (req, res) => {
 
           shifts: true,
         },
-      });
+      }),
+    ]);
 
-    const result = assignments.map((a) => ({
-      assignment_id: a.assignment_id,
-      status: a.status,
-      time_done: a.time_done,
-      flag_level: a.flag_level,
-      observation: a.observation,
+    // task_id -> completion row
+    const completedMap = new Map();
 
-      task: a.care_tasks,
+    completedToday.forEach((row) => {
+      completedMap.set(row.task_id, row);
+    });
 
-      patient: a.patients?.users
-        ? {
-          name: a.patients.users.full_name,
-        }
-        : null,
-    }));
+    const result = assignments.map((assignment) => {
 
-    return res.json({
+      const completedRow =
+        completedMap.get(assignment.task_id);
+
+      return {
+        assignment_id: assignment.assignment_id,
+
+        task_id: assignment.task_id,
+
+        status: completedRow
+          ? completedRow.status
+          : "pending",
+
+        time_done: completedRow
+          ? completedRow.actual_time_done
+          : null,
+
+        flag_level: completedRow
+          ? completedRow.flag_level
+          : "green",
+
+        observation: completedRow
+          ? completedRow.observation
+          : null,
+
+        photo_evidence: completedRow
+          ? completedRow.photo_evidence
+          : null,
+
+        task: assignment.care_tasks,
+
+        patient: assignment.patients?.users
+          ? {
+            name:
+              assignment.patients.users.full_name,
+          }
+          : null,
+      };
+    });
+
+    return res.status(200).json({
       success: true,
 
       caregiver: activeCaregiverShift?.users
         ? {
-          name: activeCaregiverShift.users.full_name,
-          phone: activeCaregiverShift.users.phone_number,
-          shift: activeCaregiverShift.shifts?.shift_name,
+          name:
+            activeCaregiverShift.users.full_name,
+
+          phone:
+            activeCaregiverShift.users.phone_number,
+
+          shift:
+            activeCaregiverShift.shifts?.shift_name,
         }
         : null,
 
@@ -88,14 +263,18 @@ export const getPatientTasks = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
+
+    console.error(
+      "Get Patient Tasks Error:",
+      err
+    );
+
+    return res.status(500).json({
       success: false,
       message: "Server error",
     });
   }
 };
-
 
 
 

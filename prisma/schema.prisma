@@ -97,6 +97,8 @@ model task_assignments {
   shift_id        Int?
   status          task_assignments_status
   time_done       DateTime?                    @db.Timestamp(0)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @updatedAt @db.Timestamp(0)
   flag_level      task_assignments_flag_level? @default(green)
   observation     String?                      @db.Text
   photo_evidence  String?                      @db.VarChar(512)
