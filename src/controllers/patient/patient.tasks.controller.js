@@ -155,11 +155,6 @@ export const getPatientTasks = async (req, res) => {
       prisma.completed_tasks.findMany({
         where: {
           patient_id: patientId,
-
-          actual_time_done: {
-            gte: startOfDay,
-            lte: endOfDay,
-          },
         },
 
         select: {
@@ -196,16 +191,38 @@ export const getPatientTasks = async (req, res) => {
     ]);
 
     // task_id -> completion row
-    const completedMap = new Map();
+    // const completedMap = new Map();
+
+    // completedToday.forEach((row) => {
+    //   completedMap.set(row.task_id, row);
+    // });
+
+    const todayCompletedMap = new Map();
+    const allCompletedMap = new Map();
 
     completedToday.forEach((row) => {
-      completedMap.set(row.task_id, row);
+
+      // latest completion for task
+      allCompletedMap.set(row.task_id, row);
+
+      // completion done today
+      if (
+        row.actual_time_done >= startOfDay &&
+        row.actual_time_done <= endOfDay
+      ) {
+        todayCompletedMap.set(row.task_id, row);
+      }
     });
 
     const result = assignments.map((assignment) => {
 
-      const completedRow =
-        completedMap.get(assignment.task_id);
+      const isDailyRoutine =
+        assignment.care_tasks?.task_category ===
+        "Daily_Routine";
+
+      const completedRow = isDailyRoutine
+        ? todayCompletedMap.get(assignment.task_id)
+        : allCompletedMap.get(assignment.task_id);
 
       return {
         assignment_id: assignment.assignment_id,

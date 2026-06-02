@@ -278,7 +278,6 @@ export const getCaregiverTasks = async (req, res) => {
         assignment_id: "desc",
       },
     });
-
     // ==================================
     // GET TODAY COMPLETIONS
     // ==================================
@@ -291,24 +290,49 @@ export const getCaregiverTasks = async (req, res) => {
         },
       },
     });
-
     // ==================================
     // FAST LOOKUP MAP
     // task_id -> completed row
     // ==================================
-    const completedMap = new Map();
-
-    completedToday.forEach((task) => {
-      completedMap.set(task.task_id, task);
+    const completedAll = await prisma.completed_tasks.findMany({
+      where: {
+        caregiver_id: caregiverId,
+      },
+      orderBy: {
+        actual_time_done: "desc",
+      },
     });
+    const dailyMap = new Map();
+    const allMap = new Map();
+    // today's completion map
+    completedToday.forEach((task) => {
+      if (task.assignment_id) {
+        dailyMap.set(task.assignment_id, task);
+      }
+    });
+
+    // latest completion map
+    completedAll.forEach((task) => {
+      if (
+        task.assignment_id &&
+        !allMap.has(task.assignment_id)
+      ) {
+        allMap.set(task.assignment_id, task);
+      }
+    });
+
 
     // ==================================
     // BUILD RESPONSE
     // ==================================
     const result = assignments.map((a) => {
+      const isDaily =
+        a.care_tasks?.task_category === "Daily_Routine";
+      const completedRecord = isDaily
+        ? dailyMap.get(a.assignment_id)
+        : allMap.get(a.assignment_id);
 
-      const completedRecord =
-        completedMap.get(a.task_id);
+
 
       return {
         assignment_id: a.assignment_id,

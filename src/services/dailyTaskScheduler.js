@@ -45,7 +45,7 @@ async function runDailyJob() {
     }
 
     const last = new Date(state.last_processed_date);
-
+    
     // ---------------- ALREADY RUN ----------------
     if (isSameDay(last, today)) {
         return;
