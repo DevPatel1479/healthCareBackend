@@ -292,141 +292,288 @@ export const loginController = async (req, res) => {
             if (externalData.role === "decision_maker") {
                 const record = externalData.records[0];
 
-                await prisma.$transaction(async (tx) => {
-
-                    /**
-                     * -----------------------------------------------------
-                     * CREATE FAMILY LEAD USER
-                     * matched_phone -> users.phone_number
-                     * patient_name -> users.full_name
-                     * -----------------------------------------------------
-                     */
-
-                    let familyLead = await tx.users.findFirst({
-                        where: {
-                            phone_number,
-                        },
-                    });
-
-                    if (!familyLead) {
-                        familyLead = await tx.users.create({
-                            data: {
-                                role: "family_lead",
-                                full_name:
-                                    record.patient_name || "Family Lead",
-                                phone_number,
-                                is_verified: true,
-                            },
-                        });
-                    }
-
-                    /**
-                     * -----------------------------------------------------
-                     * FAMILY LEAD CONTACT
-                     * decision_maker_name goes here
-                     * -----------------------------------------------------
-                     */
-
-                    const contactExists =
-                        await tx.family_lead_contacts.findFirst({
-                            where: {
-                                user_id: familyLead.user_id,
-                                phone_number:
-                                    record.decision_maker_phone_1,
-                            },
-                        });
-
-                    if (!contactExists) {
-                        await tx.family_lead_contacts.create({
-                            data: {
-                                user_id: familyLead.user_id,
-                                contact_name:
-                                    record.decision_maker_name,
-                                phone_number:
-                                    record.decision_maker_phone_1,
-                                priority: 1,
-                            },
-                        });
-                    }
-
-                    /**
-                     * -----------------------------------------------------
-                     * UPSERT PATIENT
-                     * -----------------------------------------------------
-                     */
-
-                    let patient = await tx.patients.findFirst({
-                        where: {
-                            external_patient_id: Number(
-                                record.patient_id
-                            ),
-                        },
-                    });
-
-                    if (!patient) {
-                        patient = await tx.patients.create({
-                            data: {
-                                external_patient_id: Number(
-                                    record.patient_id
-                                ),
-
-                                family_lead_id:
-                                    familyLead.user_id,
-
-                                category: "C",
-
-                                qr_code_hash:
-                                    crypto.randomUUID(),
-                            },
-                        });
-                    } else {
-                        await tx.patients.update({
-                            where: {
-                                patient_id:
-                                    patient.patient_id,
-                            },
-                            data: {
-                                family_lead_id:
-                                    familyLead.user_id,
-                            },
-                        });
-                    }
-
-                    /**
-                     * -----------------------------------------------------
-                     * CAREGIVERS
-                     * -----------------------------------------------------
-                     */
-
-                    const caregiverData =
-                        record.caregivers?.[0];
-
-                    if (caregiverData) {
+                await prisma.$transaction(
+                    async (tx) => {
 
                         /**
-                         * CAREGIVER USER
+                         * -----------------------------------------------------
+                         * CREATE FAMILY LEAD USER
+                         * matched_phone -> users.phone_number
+                         * patient_name -> users.full_name
+                         * -----------------------------------------------------
                          */
 
-                        let caregiver =
-                            await tx.users.findFirst({
+                        let familyLead = await tx.users.findFirst({
+                            where: {
+                                phone_number,
+                            },
+                        });
+
+                        if (!familyLead) {
+                            familyLead = await tx.users.create({
+                                data: {
+                                    role: "family_lead",
+                                    full_name:
+                                        record.patient_name || "Family Lead",
+                                    phone_number,
+                                    is_verified: true,
+                                },
+                            });
+                        }
+
+                        /**
+                         * -----------------------------------------------------
+                         * FAMILY LEAD CONTACT
+                         * decision_maker_name goes here
+                         * -----------------------------------------------------
+                         */
+
+                        const contactExists =
+                            await tx.family_lead_contacts.findFirst({
                                 where: {
+                                    user_id: familyLead.user_id,
                                     phone_number:
-                                        caregiverData.caregiver_phone,
+                                        record.decision_maker_phone_1,
                                 },
                             });
 
-                        if (!caregiver) {
-                            caregiver =
-                                await tx.users.create({
-                                    data: {
-                                        role: "caregiver",
-                                        full_name:
-                                            caregiverData.caregiver_name,
+                        if (!contactExists) {
+                            await tx.family_lead_contacts.create({
+                                data: {
+                                    user_id: familyLead.user_id,
+                                    contact_name:
+                                        record.decision_maker_name,
+                                    phone_number:
+                                        record.decision_maker_phone_1,
+                                    priority: 1,
+                                },
+                            });
+                        }
+
+                        /**
+                         * -----------------------------------------------------
+                         * UPSERT PATIENT
+                         * -----------------------------------------------------
+                         */
+
+                        let patient = await tx.patients.findFirst({
+                            where: {
+                                external_patient_id: Number(
+                                    record.patient_id
+                                ),
+                            },
+                        });
+
+                        if (!patient) {
+                            patient = await tx.patients.create({
+                                data: {
+                                    external_patient_id: Number(
+                                        record.patient_id
+                                    ),
+
+                                    family_lead_id:
+                                        familyLead.user_id,
+
+                                    category: "C",
+
+                                    qr_code_hash:
+                                        crypto.randomUUID(),
+                                },
+                            });
+                        } else {
+                            await tx.patients.update({
+                                where: {
+                                    patient_id:
+                                        patient.patient_id,
+                                },
+                                data: {
+                                    family_lead_id:
+                                        familyLead.user_id,
+                                },
+                            });
+                        }
+
+                        /**
+                         * -----------------------------------------------------
+                         * CAREGIVERS
+                         * -----------------------------------------------------
+                         */
+
+                        const caregiverData =
+                            record.caregivers?.[0];
+
+                        if (caregiverData) {
+
+                            /**
+                             * CAREGIVER USER
+                             */
+
+                            let caregiver =
+                                await tx.users.findFirst({
+                                    where: {
                                         phone_number:
                                             caregiverData.caregiver_phone,
-                                        is_verified: true,
                                     },
                                 });
+
+                            if (!caregiver) {
+                                caregiver =
+                                    await tx.users.create({
+                                        data: {
+                                            role: "caregiver",
+                                            full_name:
+                                                caregiverData.caregiver_name,
+                                            phone_number:
+                                                caregiverData.caregiver_phone,
+                                            is_verified: true,
+                                        },
+                                    });
+                            }
+
+                            /**
+                             * CAREGIVER MASTER
+                             */
+
+                            const caregiverMaster =
+                                await tx.caregiver_master.findFirst({
+                                    where: {
+                                        caregiver_id:
+                                            caregiver.user_id,
+                                    },
+                                });
+
+                            if (!caregiverMaster) {
+                                await tx.caregiver_master.create({
+                                    data: {
+                                        caregiver_id:
+                                            caregiver.user_id,
+
+                                        external_caregiver_id:
+                                            Number(
+                                                caregiverData.caregiver_id
+                                            ),
+
+                                        is_active: true,
+                                    },
+                                });
+                            }
+
+                            /**
+                             * DETERMINE SHIFT
+                             */
+
+                            const shiftName =
+                                resolveShiftName(
+                                    caregiverData.service_starttime,
+                                    caregiverData.service_endtime
+                                );
+
+                            const shift =
+                                await tx.shifts.findFirst({
+                                    where: {
+                                        shift_name: shiftName,
+                                    },
+                                });
+
+                            /**
+                             * SHIFT DATES
+                             */
+
+                            const startDateTime =
+                                parseDateTime(
+                                    caregiverData.service_startdate,
+                                    caregiverData.service_starttime
+                                );
+
+                            const endDateTime =
+                                parseDateTime(
+                                    caregiverData.service_enddate,
+                                    caregiverData.service_endtime
+                                );
+
+                            /**
+                             * CHECK EXISTING SHIFT
+                             */
+
+                            const existingShift =
+                                await tx.caregiver_shifts.findFirst({
+                                    where: {
+                                        patient_id:
+                                            patient.patient_id,
+
+                                        caregiver_id:
+                                            caregiver.user_id,
+                                    },
+                                });
+
+                            /**
+                             * INSERT SHIFT ONLY IF NOT EXISTS
+                             */
+
+                            if (!existingShift && shift) {
+                                await tx.caregiver_shifts.create({
+                                    data: {
+                                        patient_id:
+                                            patient.patient_id,
+
+                                        caregiver_id:
+                                            caregiver.user_id,
+
+                                        shift_id:
+                                            shift.shift_id,
+
+                                        start_time:
+                                            startDateTime,
+
+                                        end_time:
+                                            endDateTime,
+
+                                        verified: true,
+                                    },
+                                });
+                            }
+                        }
+                    },
+                    {
+                        timeout: 20000,
+                        maxWait: 20000,
+                    }
+
+                );
+            }
+
+            /**
+             * =========================================================
+             * CAREGIVER FLOW
+             * =========================================================
+             */
+
+            else if (externalData.role === "caregiver") {
+                const record = externalData.records[0];
+
+                await prisma.$transaction(
+                    async (tx) => {
+
+                        /**
+                         * CREATE CAREGIVER USER
+                         */
+
+                        let caregiver = await tx.users.findFirst({
+                            where: {
+                                phone_number,
+                            },
+                        });
+
+                        if (!caregiver) {
+                            caregiver = await tx.users.create({
+                                data: {
+                                    role: "caregiver",
+                                    full_name:
+                                        record.caregiver_name,
+                                    phone_number,
+                                    is_verified: true,
+                                },
+                            });
                         }
 
                         /**
@@ -449,7 +596,7 @@ export const loginController = async (req, res) => {
 
                                     external_caregiver_id:
                                         Number(
-                                            caregiverData.caregiver_id
+                                            record.caregiver_id
                                         ),
 
                                     is_active: true,
@@ -458,330 +605,191 @@ export const loginController = async (req, res) => {
                         }
 
                         /**
-                         * DETERMINE SHIFT
+                         * FIRST PATIENT ONLY
                          */
 
-                        const shiftName =
-                            resolveShiftName(
-                                caregiverData.service_starttime,
-                                caregiverData.service_endtime
-                            );
+                        const patientData =
+                            record.patients?.[0];
 
-                        const shift =
-                            await tx.shifts.findFirst({
-                                where: {
-                                    shift_name: shiftName,
-                                },
-                            });
+                        if (patientData) {
 
-                        /**
-                         * SHIFT DATES
-                         */
+                            /**
+                             * FAMILY LEAD USER
+                             */
 
-                        const startDateTime =
-                            parseDateTime(
-                                caregiverData.service_startdate,
-                                caregiverData.service_starttime
-                            );
+                            let familyLead =
+                                await tx.users.findFirst({
+                                    where: {
+                                        phone_number:
+                                            patientData.decision_maker_phone_1,
+                                    },
+                                });
 
-                        const endDateTime =
-                            parseDateTime(
-                                caregiverData.service_enddate,
-                                caregiverData.service_endtime
-                            );
+                            if (!familyLead) {
+                                familyLead =
+                                    await tx.users.create({
+                                        data: {
+                                            role: "family_lead",
 
-                        /**
-                         * CHECK EXISTING SHIFT
-                         */
+                                            full_name:
+                                                patientData.patient_name,
 
-                        const existingShift =
-                            await tx.caregiver_shifts.findFirst({
-                                where: {
-                                    patient_id:
-                                        patient.patient_id,
+                                            phone_number:
+                                                patientData.decision_maker_phone_1,
 
-                                    caregiver_id:
-                                        caregiver.user_id,
-                                },
-                            });
+                                            is_verified: true,
+                                        },
+                                    });
+                            }
 
-                        /**
-                         * INSERT SHIFT ONLY IF NOT EXISTS
-                         */
+                            /**
+                             * FAMILY LEAD CONTACT
+                             */
 
-                        if (!existingShift && shift) {
-                            await tx.caregiver_shifts.create({
-                                data: {
-                                    patient_id:
-                                        patient.patient_id,
+                            const contactExists =
+                                await tx.family_lead_contacts.findFirst({
+                                    where: {
+                                        user_id:
+                                            familyLead.user_id,
 
-                                    caregiver_id:
-                                        caregiver.user_id,
+                                        phone_number:
+                                            patientData.decision_maker_phone_1,
+                                    },
+                                });
 
-                                    shift_id:
-                                        shift.shift_id,
-
-                                    start_time:
-                                        startDateTime,
-
-                                    end_time:
-                                        endDateTime,
-
-                                    verified: true,
-                                },
-                            });
-                        }
-                    }
-                });
-            }
-
-            /**
-             * =========================================================
-             * CAREGIVER FLOW
-             * =========================================================
-             */
-
-            else if (externalData.role === "caregiver") {
-                const record = externalData.records[0];
-
-                await prisma.$transaction(async (tx) => {
-
-                    /**
-                     * CREATE CAREGIVER USER
-                     */
-
-                    let caregiver = await tx.users.findFirst({
-                        where: {
-                            phone_number,
-                        },
-                    });
-
-                    if (!caregiver) {
-                        caregiver = await tx.users.create({
-                            data: {
-                                role: "caregiver",
-                                full_name:
-                                    record.caregiver_name,
-                                phone_number,
-                                is_verified: true,
-                            },
-                        });
-                    }
-
-                    /**
-                     * CAREGIVER MASTER
-                     */
-
-                    const caregiverMaster =
-                        await tx.caregiver_master.findFirst({
-                            where: {
-                                caregiver_id:
-                                    caregiver.user_id,
-                            },
-                        });
-
-                    if (!caregiverMaster) {
-                        await tx.caregiver_master.create({
-                            data: {
-                                caregiver_id:
-                                    caregiver.user_id,
-
-                                external_caregiver_id:
-                                    Number(
-                                        record.caregiver_id
-                                    ),
-
-                                is_active: true,
-                            },
-                        });
-                    }
-
-                    /**
-                     * FIRST PATIENT ONLY
-                     */
-
-                    const patientData =
-                        record.patients?.[0];
-
-                    if (patientData) {
-
-                        /**
-                         * FAMILY LEAD USER
-                         */
-
-                        let familyLead =
-                            await tx.users.findFirst({
-                                where: {
-                                    phone_number:
-                                        patientData.decision_maker_phone_1,
-                                },
-                            });
-
-                        if (!familyLead) {
-                            familyLead =
-                                await tx.users.create({
+                            if (!contactExists) {
+                                await tx.family_lead_contacts.create({
                                     data: {
-                                        role: "family_lead",
+                                        user_id:
+                                            familyLead.user_id,
 
-                                        full_name:
-                                            patientData.patient_name,
+                                        contact_name:
+                                            patientData.decision_maker_name,
 
                                         phone_number:
                                             patientData.decision_maker_phone_1,
 
-                                        is_verified: true,
+                                        priority: 1,
                                     },
                                 });
-                        }
+                            }
 
-                        /**
-                         * FAMILY LEAD CONTACT
-                         */
+                            /**
+                             * UPSERT PATIENT
+                             */
 
-                        const contactExists =
-                            await tx.family_lead_contacts.findFirst({
-                                where: {
-                                    user_id:
-                                        familyLead.user_id,
-
-                                    phone_number:
-                                        patientData.decision_maker_phone_1,
-                                },
-                            });
-
-                        if (!contactExists) {
-                            await tx.family_lead_contacts.create({
-                                data: {
-                                    user_id:
-                                        familyLead.user_id,
-
-                                    contact_name:
-                                        patientData.decision_maker_name,
-
-                                    phone_number:
-                                        patientData.decision_maker_phone_1,
-
-                                    priority: 1,
-                                },
-                            });
-                        }
-
-                        /**
-                         * UPSERT PATIENT
-                         */
-
-                        let patient =
-                            await tx.patients.findFirst({
-                                where: {
-                                    external_patient_id:
-                                        Number(
-                                            patientData.patient_id
-                                        ),
-                                },
-                            });
-
-                        if (!patient) {
-                            patient =
-                                await tx.patients.create({
-                                    data: {
+                            let patient =
+                                await tx.patients.findFirst({
+                                    where: {
                                         external_patient_id:
                                             Number(
                                                 patientData.patient_id
                                             ),
-
-                                        family_lead_id:
-                                            familyLead.user_id,
-
-                                        category: "C",
-
-                                        qr_code_hash:
-                                            crypto.randomUUID(),
                                     },
                                 });
-                        } else {
-                            await tx.patients.update({
-                                where: {
-                                    patient_id:
-                                        patient.patient_id,
-                                },
-                                data: {
-                                    family_lead_id:
-                                        familyLead.user_id,
-                                },
-                            });
+
+                            if (!patient) {
+                                patient =
+                                    await tx.patients.create({
+                                        data: {
+                                            external_patient_id:
+                                                Number(
+                                                    patientData.patient_id
+                                                ),
+
+                                            family_lead_id:
+                                                familyLead.user_id,
+
+                                            category: "C",
+
+                                            qr_code_hash:
+                                                crypto.randomUUID(),
+                                        },
+                                    });
+                            } else {
+                                await tx.patients.update({
+                                    where: {
+                                        patient_id:
+                                            patient.patient_id,
+                                    },
+                                    data: {
+                                        family_lead_id:
+                                            familyLead.user_id,
+                                    },
+                                });
+                            }
+
+                            /**
+                             * ASSIGNMENT
+                             */
+
+                            const assignment =
+                                patientData.assignment;
+
+                            const shiftName =
+                                resolveShiftName(
+                                    assignment.service_starttime,
+                                    assignment.service_endtime
+                                );
+
+                            const shift =
+                                await tx.shifts.findFirst({
+                                    where: {
+                                        shift_name: shiftName,
+                                    },
+                                });
+
+                            const startDateTime =
+                                parseDateTime(
+                                    assignment.service_startdate,
+                                    assignment.service_starttime
+                                );
+
+                            const endDateTime =
+                                parseDateTime(
+                                    assignment.service_enddate,
+                                    assignment.service_endtime
+                                );
+
+                            /**
+                             * CHECK EXISTING SHIFT
+                             */
+
+                            const existingShift =
+                                await tx.caregiver_shifts.findFirst({
+                                    where: {
+                                        patient_id:
+                                            patient.patient_id,
+
+                                        caregiver_id:
+                                            caregiver.user_id,
+                                    },
+                                });
+
+                            if (!existingShift && shift) {
+                                await tx.caregiver_shifts.create({
+                                    data: {
+                                        patient_id:
+                                            patient.patient_id,
+
+                                        caregiver_id:
+                                            caregiver.user_id,
+
+                                        shift_id:
+                                            shift.shift_id,
+
+                                        start_time:
+                                            startDateTime,
+
+                                        end_time:
+                                            endDateTime,
+
+                                        verified: true,
+                                    },
+                                });
+                            }
                         }
-
-                        /**
-                         * ASSIGNMENT
-                         */
-
-                        const assignment =
-                            patientData.assignment;
-
-                        const shiftName =
-                            resolveShiftName(
-                                assignment.service_starttime,
-                                assignment.service_endtime
-                            );
-
-                        const shift =
-                            await tx.shifts.findFirst({
-                                where: {
-                                    shift_name: shiftName,
-                                },
-                            });
-
-                        const startDateTime =
-                            parseDateTime(
-                                assignment.service_startdate,
-                                assignment.service_starttime
-                            );
-
-                        const endDateTime =
-                            parseDateTime(
-                                assignment.service_enddate,
-                                assignment.service_endtime
-                            );
-
-                        /**
-                         * CHECK EXISTING SHIFT
-                         */
-
-                        const existingShift =
-                            await tx.caregiver_shifts.findFirst({
-                                where: {
-                                    patient_id:
-                                        patient.patient_id,
-
-                                    caregiver_id:
-                                        caregiver.user_id,
-                                },
-                            });
-
-                        if (!existingShift && shift) {
-                            await tx.caregiver_shifts.create({
-                                data: {
-                                    patient_id:
-                                        patient.patient_id,
-
-                                    caregiver_id:
-                                        caregiver.user_id,
-
-                                    shift_id:
-                                        shift.shift_id,
-
-                                    start_time:
-                                        startDateTime,
-
-                                    end_time:
-                                        endDateTime,
-
-                                    verified: true,
-                                },
-                            });
-                        }
-                    }
-                });
+                    });
             }
 
             /**
@@ -813,7 +821,12 @@ export const loginController = async (req, res) => {
                         take: 1,
                     },
                 },
-            });
+            }, {
+                timeout: 20000,
+                maxWait: 20000,
+            }
+
+            );
 
             if (!user) {
                 return res.status(404).json({
