@@ -419,7 +419,7 @@ export const createPatientTask = async (req, res) => {
       prisma.caregiver_shifts.findFirst({
         where: {
           patient_id: numericPatientId,
-          end_time: null,
+          // end_time: null,
           verified: true,
         },
 
