@@ -247,10 +247,23 @@ export const loginController = async (req, res) => {
                     }
                 );
             } catch (apiError) {
+                const responseData = apiError?.response?.data;
+
                 console.error(
                     "External API Error:",
-                    apiError?.response?.data || apiError.message
+                    responseData || apiError.message
                 );
+
+                // External API explicitly says user not found
+                if (
+                    responseData?.success === false &&
+                    responseData?.message?.toLowerCase().includes("user not found")
+                ) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "User not found",
+                    });
+                }
 
                 return res.status(500).json({
                     success: false,
