@@ -260,9 +260,15 @@ export const getCaregiverTasks = async (req, res) => {
     // ==================================
     // GET MASTER TASKS
     // ==================================
+    if (!shiftToUse?.patients?.patient_id) {
+      return res.status(404).json({
+        success: false,
+        message: "No patient assigned to caregiver",
+      });
+    }
     const assignments = await prisma.task_assignments.findMany({
       where: {
-        caregiver_id: caregiverId,
+        patient_id: patientInfo?.patient_id,
       },
       include: {
         care_tasks: true,
