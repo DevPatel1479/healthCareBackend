@@ -289,7 +289,7 @@ export const getCaregiverTasks = async (req, res) => {
     // ==================================
     const completedToday = await prisma.completed_tasks.findMany({
       where: {
-        caregiver_id: caregiverId,
+        patient_id: patientInfo?.patient_id,
         actual_time_done: {
           gte: startOfDay,
           lte: endOfDay,
@@ -300,9 +300,11 @@ export const getCaregiverTasks = async (req, res) => {
     // FAST LOOKUP MAP
     // task_id -> completed row
     // ==================================
+
+
     const completedAll = await prisma.completed_tasks.findMany({
       where: {
-        caregiver_id: caregiverId,
+        patient_id: patientInfo?.patient_id,
       },
       orderBy: {
         actual_time_done: "desc",
@@ -310,6 +312,8 @@ export const getCaregiverTasks = async (req, res) => {
     });
     const dailyMap = new Map();
     const allMap = new Map();
+
+
     // today's completion map
     completedToday.forEach((task) => {
       if (task.assignment_id) {
