@@ -1,5 +1,5 @@
 // import { v4 as uuidv4 } from 'uuid';
-import prisma from "../../lib/prisma.js";
+
 // import QRCode from 'qrcode';
 
 import prisma from "../../lib/prisma.js";
