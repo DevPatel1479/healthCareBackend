@@ -41,6 +41,7 @@ model caregiver_shifts {
   patient_id   Int
   caregiver_id Int
   shift_id     Int
+  assignment_date DateTime @db.Date
 
   start_time DateTime  @db.Timestamp(0)
   end_time   DateTime? @db.Timestamp(0)
@@ -61,6 +62,7 @@ model caregiver_shifts {
   @@index([caregiver_id])
   @@index([shift_id])
   @@index([patient_id, end_time, verified])
+  @@unique([patient_id, caregiver_id, shift_id, assignment_date])
 }
 
 model patients {
