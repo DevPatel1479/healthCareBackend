@@ -109,7 +109,9 @@
 
 import prisma from "../../lib/prisma.js";
 import axios from "axios";
-import crypto from "crypto";
+// import crypto from "crypto";
+
+import { generatePatientQR } from "../../services/patientQr.service.js";
 
 const EXTERNAL_API_URL = process.env.FAMILY_MEMBER_API_URL;
 const EXTERNAL_API_TOKEN = process.env.FAMILY_MEMBER_API_TOKEN;
@@ -291,7 +293,7 @@ export const loginController = async (req, res) => {
 
             if (externalData.role === "decision_maker") {
                 const record = externalData.records[0];
-
+                let createdPatientId = null;
                 await prisma.$transaction(
                     async (tx) => {
 
@@ -375,11 +377,14 @@ export const loginController = async (req, res) => {
                                         familyLead.user_id,
 
                                     category: "C",
+                                    qr_code_hash: "",
+                                    qr_code_url: "",
 
-                                    qr_code_hash:
-                                        crypto.randomUUID(),
+
                                 },
                             });
+
+                            createdPatientId = patient.patient_id;
                         } else {
                             await tx.patients.update({
                                 where: {
@@ -534,12 +539,33 @@ export const loginController = async (req, res) => {
                             }
                         }
                     },
+
                     {
                         timeout: 20000,
                         maxWait: 20000,
                     }
 
+
+
                 );
+                if (createdPatientId) {
+
+                    const {
+                        qrValue,
+                        qrUrl,
+                    } = await generatePatientQR(createdPatientId);
+
+                    await prisma.patients.update({
+                        where: {
+                            patient_id: createdPatientId,
+                        },
+                        data: {
+                            qr_code_hash: qrValue,
+                            qr_code_url: qrUrl,
+                        },
+                    });
+
+                }
             }
 
             /**
@@ -550,7 +576,7 @@ export const loginController = async (req, res) => {
 
             else if (externalData.role === "caregiver") {
                 const record = externalData.records[0];
-
+                let createdPatientId = null;
                 await prisma.$transaction(
                     async (tx) => {
 
@@ -701,11 +727,14 @@ export const loginController = async (req, res) => {
                                                 familyLead.user_id,
 
                                             category: "C",
+                                            qr_code_hash: "",
+                                            qr_code_url: "",
 
-                                            qr_code_hash:
-                                                crypto.randomUUID(),
                                         },
                                     });
+
+                                createdPatientId = patient.patient_id;
+
                             } else {
                                 await tx.patients.update({
                                     where: {
@@ -790,6 +819,24 @@ export const loginController = async (req, res) => {
                             }
                         }
                     });
+                if (createdPatientId) {
+
+                    const {
+                        qrValue,
+                        qrUrl,
+                    } = await generatePatientQR(createdPatientId);
+
+                    await prisma.patients.update({
+                        where: {
+                            patient_id: createdPatientId,
+                        },
+                        data: {
+                            qr_code_hash: qrValue,
+                            qr_code_url: qrUrl,
+                        },
+                    });
+
+                }
             }
 
             /**
