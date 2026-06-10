@@ -18,44 +18,35 @@ model care_tasks {
   applies_to_PO    Boolean?                 @default(false)
   applies_to_PD    Boolean?                 @default(false)
   clinical_notes   String?                  @db.Text
-  task_assignments task_assignments[]
   completed_tasks  completed_tasks[]
+  task_assignments task_assignments[]
 }
 
 model caregiver_master {
-  caregiver_id          Int       @id
-  external_caregiver_id Int?      @unique
-  specialization        String?   @db.VarChar(100)
-  experience_years      Int?      @default(0)
-  assigned_area         String?   @db.VarChar(100)
-  is_active             Boolean?  @default(true)
-  joining_date          DateTime? @db.Date
-  created_at            DateTime? @default(now()) @db.Timestamp(0)
-  updated_at            DateTime? @default(now()) @db.Timestamp(0)
-  users                 users     @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_user")
+  caregiver_id     Int       @id
+  specialization   String?   @db.VarChar(100)
+  experience_years Int?      @default(0)
+  assigned_area    String?   @db.VarChar(100)
+  is_active        Boolean?  @default(true)
+  joining_date     DateTime? @db.Date
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @db.Timestamp(0)
+  users            users     @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_user")
 }
 
 model caregiver_shifts {
-  shift_assignment_id Int @id @default(autoincrement())
-
-  patient_id   Int
-  caregiver_id Int
-  shift_id     Int
-
-  start_time DateTime  @db.Timestamp(0)
-  end_time   DateTime? @db.Timestamp(0)
-
-  check_in_method String? @default("qr") @db.VarChar(20)
-
-  verified Boolean? @default(true)
-
-  handover_notes String? @db.Text
-
-  patients patients @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_patient")
-
-  users users @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_user")
-
-  shifts shifts @relation(fields: [shift_id], references: [shift_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_shift")
+  shift_assignment_id Int       @id @default(autoincrement())
+  patient_id          Int
+  caregiver_id        Int
+  shift_id            Int
+  start_time          DateTime  @db.Timestamp(0)
+  end_time            DateTime? @db.Timestamp(0)
+  check_in_method     String?   @default("qr") @db.VarChar(20)
+  verified            Boolean?  @default(true)
+  handover_notes      String?   @db.Text
+  patients            patients  @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_patient")
+  shifts              shifts    @relation(fields: [shift_id], references: [shift_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_shift")
+  users               users     @relation(fields: [caregiver_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_user")
 
   @@index([patient_id])
   @@index([caregiver_id])
@@ -64,19 +55,18 @@ model caregiver_shifts {
 }
 
 model patients {
-  patient_id          Int                @id @default(autoincrement())
-  external_patient_id Int?               @unique
-  family_lead_id      Int
-  qr_code_hash        String             @unique(map: "qr_code_hash") @db.VarChar(255)
-  category patients_category?
-  medical_history     String?            @db.Text
-  status              patients_status?   @default(active)
-  created_at          DateTime?          @default(now()) @db.Timestamp(0)
-  updated_at          DateTime?          @default(now()) @db.Timestamp(0)
-  users               users              @relation(fields: [family_lead_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_family_lead")
-  task_assignments    task_assignments[]
-  caregiver_shifts    caregiver_shifts[]
-  completed_tasks     completed_tasks[]
+  patient_id       Int                @id @default(autoincrement())
+  family_lead_id   Int
+  qr_code_hash     String             @unique(map: "qr_code_hash") @db.VarChar(255)
+  category         patients_category
+  medical_history  String?            @db.Text
+  status           patients_status?   @default(active)
+  created_at       DateTime?          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(0)
+  caregiver_shifts caregiver_shifts[]
+  completed_tasks  completed_tasks[]
+  users            users              @relation(fields: [family_lead_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_family_lead")
+  task_assignments task_assignments[]
 
   @@index([family_lead_id], map: "fk_family_lead")
 }
@@ -86,9 +76,9 @@ model shifts {
   shift_name       String?            @db.VarChar(50)
   start_time       DateTime?          @db.Time(0)
   end_time         DateTime?          @db.Time(0)
-  task_assignments task_assignments[]
   caregiver_shifts caregiver_shifts[]
   completed_tasks  completed_tasks[]
+  task_assignments task_assignments[]
 }
 
 model task_assignments {
@@ -99,17 +89,17 @@ model task_assignments {
   shift_id        Int?
   status          task_assignments_status
   time_done       DateTime?                    @db.Timestamp(0)
-  created_at      DateTime?                    @default(now()) @db.Timestamp(0)
-  updated_at      DateTime?                    @updatedAt @db.Timestamp(0)
   flag_level      task_assignments_flag_level? @default(green)
   observation     String?                      @db.Text
   photo_evidence  String?                      @db.VarChar(512)
   supervisor_val  Boolean?                     @default(false)
+  created_at      DateTime?                    @default(now()) @db.Timestamp(0)
+  updated_at      DateTime?                    @updatedAt @db.Timestamp(0)
+  completed_tasks completed_tasks?
   care_tasks      care_tasks?                  @relation(fields: [task_id], references: [task_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_1")
   patients        patients?                    @relation(fields: [patient_id], references: [patient_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_2")
   users           users?                       @relation(fields: [caregiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_3")
   shifts          shifts?                      @relation(fields: [shift_id], references: [shift_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_4")
-  completed_tasks completed_tasks[]
 
   @@index([caregiver_id], map: "caregiver_id")
   @@index([patient_id], map: "patient_id")
@@ -118,22 +108,68 @@ model task_assignments {
 }
 
 model users {
-  user_id          Int                    @id @default(autoincrement())
+  user_id          Int                @id @default(autoincrement())
   role             users_role
-  full_name        String                 @db.VarChar(100)
-  email            String?                @unique(map: "email") @db.VarChar(255)
-  phone_number     String                 @db.VarChar(20)
-  password_hash    String?                @db.VarChar(255)
-  is_verified      Boolean?               @default(false)
-  last_login       DateTime?              @db.Timestamp(0)
-  created_at       DateTime?              @default(now()) @db.Timestamp(0)
-  updated_at       DateTime?              @default(now()) @db.Timestamp(0)
+  full_name        String             @db.VarChar(100)
+  email            String             @unique(map: "email") @db.VarChar(255)
+  phone_number     String             @db.VarChar(20)
+  password_hash    String             @db.VarChar(255)
+  is_verified      Boolean?           @default(false)
+  last_login       DateTime?          @db.Timestamp(0)
+  created_at       DateTime?          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(0)
   caregiver_master caregiver_master?
-  patients         patients[]
-  family_contacts  family_lead_contacts[]
-  task_assignments task_assignments[]
   caregiver_shifts caregiver_shifts[]
   completed_tasks  completed_tasks[]
+  patients         patients[]
+  task_assignments task_assignments[]
+}
+
+model completed_tasks {
+  completed_task_id Int                          @id @default(autoincrement())
+  task_id           Int?
+  patient_id        Int?
+  caregiver_id      Int?
+  shift_id          Int?
+  assignment_id     Int?                         @unique
+  scheduled_time    DateTime?                    @db.Timestamp(0)
+  actual_time_done  DateTime?                    @db.Timestamp(0)
+  status            completed_tasks_status
+  flag_level        task_assignments_flag_level? @default(green)
+  observation       String?                      @db.Text
+  photo_evidence    String?                      @db.VarChar(512)
+  created_at        DateTime?                    @default(now()) @db.Timestamp(0)
+  updated_at        DateTime?                    @updatedAt @db.Timestamp(0)
+  task_assignments  task_assignments?            @relation(fields: [assignment_id], references: [assignment_id], onDelete: NoAction, onUpdate: NoAction)
+  users             users?                       @relation(fields: [caregiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  patients          patients?                    @relation(fields: [patient_id], references: [patient_id], onDelete: NoAction, onUpdate: NoAction)
+  shifts            shifts?                      @relation(fields: [shift_id], references: [shift_id], onDelete: NoAction, onUpdate: NoAction)
+  care_tasks        care_tasks?                  @relation(fields: [task_id], references: [task_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([task_id])
+  @@index([patient_id])
+  @@index([caregiver_id])
+  @@index([shift_id])
+  @@index([assignment_id])
+}
+
+model scheduler_state {
+  id                  Int       @id @default(1)
+  last_processed_date DateTime  @db.Date
+  created_at          DateTime? @default(now()) @db.Timestamp(0)
+  updated_at          DateTime? @updatedAt @db.Timestamp(0)
+}
+
+model otp_verifications {
+  id         Int      @id @default(autoincrement())
+  phone      String   @db.VarChar(20)
+  otp        String   @db.VarChar(10)
+  expires_at DateTime
+  created_at DateTime @default(now())
+  used       Boolean  @default(false)
+
+  @@index([phone])
+  @@index([phone, created_at])
 }
 
 enum users_role {
@@ -180,76 +216,4 @@ enum completed_tasks_status {
   skipped
   refused
   partial
-}
-
-model completed_tasks {
-  completed_task_id Int @id @default(autoincrement())
-
-  task_id       Int?
-  patient_id    Int?
-  caregiver_id  Int?
-  shift_id      Int?
-  assignment_id Int? @unique
-
-  scheduled_time   DateTime? @db.Timestamp(0)
-  actual_time_done DateTime? @db.Timestamp(0)
-
-  status     completed_tasks_status
-  flag_level task_assignments_flag_level? @default(green)
-
-  observation    String? @db.Text
-  photo_evidence String? @db.VarChar(512)
-
-  created_at DateTime? @default(now()) @db.Timestamp(0)
-  updated_at DateTime? @updatedAt @db.Timestamp(0)
-
-  // Relations
-  care_tasks       care_tasks?       @relation(fields: [task_id], references: [task_id], onDelete: NoAction, onUpdate: NoAction)
-  patients         patients?         @relation(fields: [patient_id], references: [patient_id], onDelete: NoAction, onUpdate: NoAction)
-  users            users?            @relation(fields: [caregiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
-  shifts           shifts?           @relation(fields: [shift_id], references: [shift_id], onDelete: NoAction, onUpdate: NoAction)
-  task_assignments task_assignments? @relation(fields: [assignment_id], references: [assignment_id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@index([task_id])
-  @@index([patient_id])
-  @@index([caregiver_id])
-  @@index([shift_id])
-  @@index([assignment_id])
-}
-
-model scheduler_state {
-  id                  Int       @id @default(1)
-  last_processed_date DateTime  @db.Date
-  created_at          DateTime? @default(now()) @db.Timestamp(0)
-  updated_at          DateTime? @updatedAt @db.Timestamp(0)
-}
-
-model otp_verifications {
-  id         Int      @id @default(autoincrement())
-  phone      String   @db.VarChar(20)
-  otp        String   @db.VarChar(10)
-  expires_at DateTime
-  created_at DateTime @default(now())
-  used       Boolean  @default(false)
-
-  @@index([phone])
-  @@index([phone, created_at])
-}
-
-model family_lead_contacts {
-  id Int @id @default(autoincrement())
-
-  user_id Int
-
-  contact_name String? @db.VarChar(100)
-
-  phone_number String @db.VarChar(20)
-
-  priority Int? @default(1)
-
-  created_at DateTime? @default(now()) @db.Timestamp(0)
-
-  users users @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-
-  @@index([user_id])
 }
