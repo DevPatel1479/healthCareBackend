@@ -224,7 +224,7 @@ export const verifyCaregiverQr = async (req, res) => {
 
                     assignment_date: today,
 
-                    start_time: new Date(),
+                    start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000),
 
                     verified: true,
 
