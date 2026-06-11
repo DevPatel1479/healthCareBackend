@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 3000;
 // const server = http.createServer(app);
 
 let io = null;
-process.env.TZ = "UTC";
+
 
 if (!process.env.VERCEL) {
   const server = http.createServer(app);
