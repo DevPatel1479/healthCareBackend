@@ -6,6 +6,7 @@ import { updateTaskStatus } from '../controllers/caregiver/caregiver.update.task
 import { getAllCaregivers } from '../controllers/caregiver/get.all.caregivers.controller.js';
 import { getCaregiverOverallReport, getCaregiverPatientWiseReport } from '../controllers/caregiver/caregiver.report.controller.js';
 import { getCaregiverDetails } from '../controllers/caregiver/get.caregiver.details.controller.js';
+import { verifyCaregiverQr } from '../controllers/caregiver/verify.caregiver.controller.js';
 const router = express.Router()
 
 router.get("/caregiver/:id/tasks", getCaregiverTasks);
@@ -22,6 +23,10 @@ router.post(
     getCaregiverPatientWiseReport
 );
 
+router.post(
+    "/verify-caregiver-qr",
+    verifyCaregiverQr
+);
 
 
 export default router
