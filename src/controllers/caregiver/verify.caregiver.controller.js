@@ -84,11 +84,36 @@ export const verifyCaregiverQr = async (req, res) => {
          * STEP 2 : VERIFY PATIENT EXISTS
          * -----------------------------------------
          */
+        const dbPatient = await prisma.patients.findUnique({
+            where: {
+                patient_id: Number(patient_id),
+            },
+            select: {
+                patient_id: true,
+                external_patient_id: true,
+            },
+        });
+
+        if (!dbPatient) {
+            return res.status(404).json({
+                success: false,
+                message: "Patient not found",
+            });
+        }
+
+        if (!dbPatient.external_patient_id) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Patient is not mapped to external system",
+            });
+        }
+
         const assignedPatient =
             caregiverRecord.patients?.find(
                 (patient) =>
                     Number(patient.patient_id) ===
-                    Number(patient_id)
+                    Number(dbPatient.external_patient_id)
             );
 
         if (!assignedPatient) {
