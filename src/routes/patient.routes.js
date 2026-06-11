@@ -7,7 +7,12 @@ import { generateOrUpdatePatientQR } from '../controllers/patient/patient.create
 import { getAllPatients } from '../controllers/patient/get.all.patients.controller.js';
 import { getPatientDetails } from '../controllers/patient/get.patient.details.controller.js';
 import { getPatientQrCode } from '../controllers/patient/patient.qr.controller.js';
+import { getFamilyLeadContacts } from '../controllers/patient/patient.family.leads..controller.js';
+
 const router = express.Router()
+
+
+
 
 router.get("/patient/:id/tasks", getPatientTasks);
 router.post("/patient/create-task", createPatientTask);
@@ -20,6 +25,8 @@ router.get(
     "/patient/:patient_id/qr-code",
     getPatientQrCode
 );
+
+router.get("/patient/:patient_id/family-contacts", getFamilyLeadContacts);
 
 
 export default router
