@@ -5,6 +5,17 @@ import prisma from "../../lib/prisma.js";
 const EXTERNAL_API_URL = process.env.FAMILY_MEMBER_API_URL;
 const EXTERNAL_API_TOKEN = process.env.FAMILY_MEMBER_API_TOKEN;
 
+const mysqlDateTime = () => {
+    const d = new Date();
+    return d.getFullYear() + "-" +
+        String(d.getMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getDate()).padStart(2, "0") + " " +
+        String(d.getHours()).padStart(2, "0") + ":" +
+        String(d.getMinutes()).padStart(2, "0") + ":" +
+        String(d.getSeconds()).padStart(2, "0");
+};
+
+
 export const verifyCaregiverQr = async (req, res) => {
     try {
         const {
@@ -224,7 +235,7 @@ export const verifyCaregiverQr = async (req, res) => {
 
                     assignment_date: today,
 
-                    start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000),
+                    start_time: mysqlDateTime(),
 
                     verified: true,
 
