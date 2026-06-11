@@ -171,7 +171,8 @@ export const getCaregiverTasks = async (req, res) => {
     }
 
     const now = new Date();
-
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     // ==================================
     // TODAY RANGE
     // ==================================
@@ -188,6 +189,7 @@ export const getCaregiverTasks = async (req, res) => {
       where: {
         caregiver_id: caregiverId,
         verified: true,
+        assignment_date: today,
         start_time: { lte: now },
         OR: [
           { end_time: null },
@@ -223,6 +225,7 @@ export const getCaregiverTasks = async (req, res) => {
         where: {
           caregiver_id: caregiverId,
           verified: true,
+          assignment_date: today,
         },
         orderBy: {
           start_time: "desc",

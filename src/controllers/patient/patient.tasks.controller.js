@@ -97,6 +97,10 @@ import { io } from "../../server.js";
 // };
 
 
+const getTodayDateOnly = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+};
 
 export const getPatientTasks = async (req, res) => {
   try {
@@ -115,13 +119,13 @@ export const getPatientTasks = async (req, res) => {
         timeZone: "Asia/Kolkata",
       })
     );
-
+    const now = new Date();
     const startOfDay = new Date(nowIST);
     startOfDay.setHours(0, 0, 0, 0);
 
     const endOfDay = new Date(nowIST);
     endOfDay.setHours(23, 59, 59, 999);
-
+    const today = getTodayDateOnly();
     const [
       assignments,
       completedToday,
@@ -171,6 +175,14 @@ export const getPatientTasks = async (req, res) => {
         where: {
           patient_id: patientId,
           verified: true,
+          assignment_date: today,
+          start_time: {
+            lte: now,
+          },
+          OR: [
+            { end_time: null },
+            { end_time: { gte: now } },
+          ],
         },
 
         orderBy: {
@@ -402,6 +414,10 @@ export const createPatientTask = async (req, res) => {
     }
 
     const numericPatientId = Number(patient_id);
+    const now = new Date();
+
+
+    const today = getTodayDateOnly();
 
     // ✅ Parallel queries (FASTER)
     const [patient, activeShift] = await Promise.all([
@@ -421,6 +437,14 @@ export const createPatientTask = async (req, res) => {
           patient_id: numericPatientId,
           // end_time: null,
           verified: true,
+          assignment_date: today,
+          start_time: {
+            lte: now,
+          },
+          OR: [
+            { end_time: null },
+            { end_time: { gte: now } },
+          ],
         },
 
         orderBy: {
