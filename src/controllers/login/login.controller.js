@@ -297,7 +297,6 @@ export const loginController = async (req, res) => {
                 let createdPatientId = null;
                 await prisma.$transaction(
                     async (tx) => {
-
                         /**
                          * -----------------------------------------------------
                          * CREATE FAMILY LEAD USER
@@ -545,7 +544,7 @@ export const loginController = async (req, res) => {
 
                     {
                         timeout: 20000,
-                        maxWait: 20000,
+                        maxWait: 60000,
                     }
 
 
@@ -825,7 +824,12 @@ export const loginController = async (req, res) => {
                                 });
                             }
                         }
-                    });
+                    },
+                    {
+                        timeout: 20000,
+                        maxWait: 60000,
+                    }
+                );
                 if (createdPatientId) {
 
                     const {
@@ -877,7 +881,7 @@ export const loginController = async (req, res) => {
                 },
             }, {
                 timeout: 20000,
-                maxWait: 20000,
+                maxWait: 60000,
             }
 
             );
