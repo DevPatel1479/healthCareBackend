@@ -5,6 +5,9 @@ import prisma from "../../lib/prisma.js";
 const EXTERNAL_API_URL = process.env.FAMILY_MEMBER_API_URL;
 const EXTERNAL_API_TOKEN = process.env.FAMILY_MEMBER_API_TOKEN;
 
+
+
+
 export const verifyCaregiverQr = async (req, res) => {
     try {
         const {
@@ -132,6 +135,8 @@ export const verifyCaregiverQr = async (req, res) => {
          * Replace later with proper
          * service_starttime/service_endtime mapping.
          */
+
+
         const shift = await prisma.shifts.findFirst({
             orderBy: {
                 shift_id: "asc",
@@ -154,6 +159,11 @@ export const verifyCaregiverQr = async (req, res) => {
          * STEP 4 : CHECK ACTIVE SHIFT
          * -----------------------------------------
          */
+
+        const now = new Date();
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
         const existingShift =
             await prisma.caregiver_shifts.findFirst({
                 where: {
@@ -164,7 +174,14 @@ export const verifyCaregiverQr = async (req, res) => {
                         patient_id
                     ),
                     assignment_date: today,
-                    end_time: null,
+                    start_time: {
+                        lte: now,
+                    },
+
+                    OR: [
+                        { end_time: null },
+                        { end_time: { gte: now } },
+                    ],
                 },
                 orderBy: {
                     start_time: "desc",
