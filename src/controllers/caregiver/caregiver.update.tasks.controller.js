@@ -73,7 +73,7 @@ export const updateTaskStatus = async (req, res) => {
     //   new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
     // );
 
-    const nowIST = new Date(Date.now() + 19800000);
+    const nowIST = new Date();
 
     // const updatedTask = await prisma.$transaction(async (tx) => {
     //   // 🔹 Update task
