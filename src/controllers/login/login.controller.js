@@ -225,7 +225,8 @@ export const loginController = async (req, res) => {
          * 2. IF USER NOT FOUND -> CALL EXTERNAL API
          * =========================================================
          */
-
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         if (!user) {
             const currentDate = new Date()
                 .toISOString()
@@ -508,6 +509,7 @@ export const loginController = async (req, res) => {
 
                                         caregiver_id:
                                             caregiver.user_id,
+                                        assignment_date: today,
                                     },
                                 });
 
@@ -534,6 +536,7 @@ export const loginController = async (req, res) => {
                                             endDateTime,
 
                                         verified: true,
+                                        assignment_date: today,
                                     },
                                 });
                             }
@@ -792,6 +795,8 @@ export const loginController = async (req, res) => {
 
                                         caregiver_id:
                                             caregiver.user_id,
+                                        assignment_date: today,
+
                                     },
                                 });
 
@@ -814,6 +819,8 @@ export const loginController = async (req, res) => {
                                             endDateTime,
 
                                         verified: true,
+
+                                        assignment_date: today,
                                     },
                                 });
                             }
