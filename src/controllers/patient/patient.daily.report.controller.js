@@ -3,7 +3,11 @@ import prisma from "../../lib/prisma.js";
 export const getPatientDailyReport = async (req, res) => {
     try {
 
-        const { patient_id, date } = req.body;
+        const {
+            patient_id,
+            date,
+            returnPending = false,
+        } = req.body;
 
         // ✅ Validation
         if (!patient_id || !date) {
@@ -20,12 +24,49 @@ export const getPatientDailyReport = async (req, res) => {
         const endOfDay = new Date(`${date}T23:59:59.999Z`);
 
         // ✅ FETCH FROM completed_tasks
-        const completedTasks = await prisma.completed_tasks.findMany({
+        // const completedTasks = await prisma.completed_tasks.findMany({
 
+        //     where: {
+
+        //         patient_id: Number(patient_id),
+
+        //         actual_time_done: {
+        //             gte: startOfDay,
+        //             lte: endOfDay,
+        //         },
+        //     },
+
+        //     include: {
+
+        //         care_tasks: {
+
+        //             select: {
+        //                 task_id: true,
+        //                 description: true,
+        //                 task_category: true,
+        //                 scheduled_time: true,
+        //             },
+        //         },
+
+        //         users: {
+
+        //             select: {
+        //                 user_id: true,
+        //                 full_name: true,
+        //                 phone_number: true,
+        //             },
+        //         },
+        //     },
+
+        //     orderBy: {
+        //         actual_time_done: "asc",
+        //     },
+        // });
+
+
+        const completedTasksPromise = prisma.completed_tasks.findMany({
             where: {
-
                 patient_id: Number(patient_id),
-
                 actual_time_done: {
                     gte: startOfDay,
                     lte: endOfDay,
@@ -33,9 +74,7 @@ export const getPatientDailyReport = async (req, res) => {
             },
 
             include: {
-
                 care_tasks: {
-
                     select: {
                         task_id: true,
                         description: true,
@@ -45,7 +84,6 @@ export const getPatientDailyReport = async (req, res) => {
                 },
 
                 users: {
-
                     select: {
                         user_id: true,
                         full_name: true,
@@ -58,9 +96,46 @@ export const getPatientDailyReport = async (req, res) => {
                 actual_time_done: "asc",
             },
         });
+        const pendingTasksPromise = returnPending
+            ? prisma.task_assignments.findMany({
+                where: {
+                    patient_id: Number(patient_id),
+                    status: "pending",
+                },
+
+                include: {
+                    care_tasks: {
+                        select: {
+                            task_id: true,
+                            description: true,
+                            task_category: true,
+                            scheduled_time: true,
+                        },
+                    },
+
+                    users: {
+                        select: {
+                            user_id: true,
+                            full_name: true,
+                            phone_number: true,
+                        },
+                    },
+                },
+
+                orderBy: {
+                    created_at: "asc",
+                },
+            })
+            : Promise.resolve([]);
+
+        const [completedTasks, pendingTasks] = await Promise.all([
+            completedTasksPromise,
+            pendingTasksPromise,
+        ]);
+
 
         // ✅ FORMAT RESPONSE
-        const report = completedTasks.map((task) => ({
+        const completedReport = completedTasks.map((task) => ({
 
             completed_task_id: task.completed_task_id,
 
@@ -100,6 +175,52 @@ export const getPatientDailyReport = async (req, res) => {
                     ? task.photo_evidence
                     : null,
         }));
+
+        const pendingReport = pendingTasks.map((task) => ({
+            completed_task_id: null,
+
+            assignment_id: task.assignment_id,
+
+            task_id: task.task_id,
+
+            task_description:
+                task.care_tasks?.description ?? null,
+
+            task_category:
+                task.care_tasks?.task_category ?? null,
+
+            scheduled_time:
+                task.care_tasks?.scheduled_time ?? null,
+
+            status: task.status,
+
+            completed_at: null,
+
+            observation_notes: null,
+
+            caregiver: task.users
+                ? {
+                    caregiver_id: task.users.user_id,
+                    full_name: task.users.full_name,
+                    phone_number: task.users.phone_number,
+                }
+                : null,
+
+            photo_proof: null,
+        }));
+
+        const report = [...completedReport, ...pendingReport].sort((a, b) => {
+
+            const timeA = a.completed_at
+                ? new Date(a.completed_at).getTime()
+                : Number.MAX_SAFE_INTEGER;
+
+            const timeB = b.completed_at
+                ? new Date(b.completed_at).getTime()
+                : Number.MAX_SAFE_INTEGER;
+
+            return timeA - timeB;
+        });
 
         return res.status(200).json({
 
