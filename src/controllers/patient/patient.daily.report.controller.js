@@ -133,14 +133,32 @@ export const getPatientDailyReport = async (req, res) => {
             completedTasksPromise,
             pendingTasksPromise,
         ]);
+        const completedAssignmentIds = new Set(
+            completedTasks
+                .filter(task => task.assignment_id !== null)
+                .map(task => task.assignment_id)
+        );
+
         const completedTaskIds = new Set(
-            completedTasks.map(task => task.task_id)
+            completedTasks
+                .filter(task => task.task_id !== null)
+                .map(task => task.task_id)
         );
 
         const actualPendingTasks = returnPending
-            ? pendingTasks.filter(task => !completedTaskIds.has(task.task_id))
-            : [];
+            ? pendingTasks.filter((task) => {
 
+                const category = task.care_tasks?.task_category;
+
+                // Daily/Routine
+                if (category === "Daily_Routine") {
+                    return !completedAssignmentIds.has(task.assignment_id);
+                }
+
+                // Periodic & Unplanned/As Required
+                return !completedTaskIds.has(task.task_id);
+            })
+            : [];
         // ✅ FORMAT RESPONSE
         const completedReport = completedTasks.map((task) => ({
 
