@@ -96,6 +96,37 @@ export const getPatientDailyReport = async (req, res) => {
                 actual_time_done: "asc",
             },
         });
+
+        const otherCompletedTasksPromise = returnPending
+            ? prisma.completed_tasks.findMany({
+                where: {
+                    patient_id: Number(patient_id),
+                    care_tasks: {
+                        task_category: {
+                            not: "Daily_Routine",
+                        },
+                    },
+                },
+
+                include: {
+                    care_tasks: {
+                        select: {
+                            task_id: true,
+                            description: true,
+                            task_category: true,
+                            scheduled_time: true,
+                        },
+                    },
+                    users: {
+                        select: {
+                            user_id: true,
+                            full_name: true,
+                            phone_number: true,
+                        },
+                    },
+                },
+            })
+            : Promise.resolve([]);
         const pendingTasksPromise = returnPending
             ? prisma.task_assignments.findMany({
                 where: {
@@ -127,26 +158,29 @@ export const getPatientDailyReport = async (req, res) => {
             })
             : Promise.resolve([]);
 
-        const allCompletedTaskIdsPromise = returnPending
-            ? prisma.completed_tasks.findMany({
-                where: {
-                    patient_id: Number(patient_id),
-                },
-                select: {
-                    task_id: true,
-                },
-            })
-            : Promise.resolve([]);
 
         const [
             completedTasks,
+            otherCompletedTasks,
             pendingTasks,
-            allCompletedTaskIds,
+
         ] = await Promise.all([
             completedTasksPromise,
+            otherCompletedTasksPromise,
             pendingTasksPromise,
-            allCompletedTaskIdsPromise,
+
         ]);
+        const completedMap = new Map();
+
+        completedTasks.forEach(task => {
+            completedMap.set(task.completed_task_id, task);
+        });
+
+        otherCompletedTasks.forEach(task => {
+            completedMap.set(task.completed_task_id, task);
+        });
+
+        const finalCompletedTasks = [...completedMap.values()];
         const completedTodayTaskIds = new Set(
             completedTasks
                 .filter(task => task.task_id != null)
@@ -155,7 +189,7 @@ export const getPatientDailyReport = async (req, res) => {
 
         // Tasks completed anytime
         const completedEverTaskIds = new Set(
-            allCompletedTaskIds
+            finalCompletedTasks
                 .filter(task => task.task_id != null)
                 .map(task => task.task_id)
         );
@@ -174,7 +208,7 @@ export const getPatientDailyReport = async (req, res) => {
                 return !completedEverTaskIds.has(task.task_id);
             })
             : [];
-        const completedReport = completedTasks.map((task) => ({
+        const completedReport = finalCompletedTasks.map((task) => ({
 
             completed_task_id: task.completed_task_id,
 
