@@ -127,21 +127,36 @@ export const getPatientDailyReport = async (req, res) => {
             })
             : Promise.resolve([]);
 
+        const allCompletedTaskIdsPromise = returnPending
+            ? prisma.completed_tasks.findMany({
+                where: {
+                    patient_id: Number(patient_id),
+                },
+                select: {
+                    task_id: true,
+                },
+            })
+            : Promise.resolve([]);
 
-
-        const [completedTasks, pendingTasks] = await Promise.all([
+        const [
+            completedTasks,
+            pendingTasks,
+            allCompletedTaskIds,
+        ] = await Promise.all([
             completedTasksPromise,
             pendingTasksPromise,
+            allCompletedTaskIdsPromise,
         ]);
-        const completedAssignmentIds = new Set(
+        const completedTodayTaskIds = new Set(
             completedTasks
-                .filter(task => task.assignment_id !== null)
-                .map(task => task.assignment_id)
+                .filter(task => task.task_id != null)
+                .map(task => task.task_id)
         );
 
-        const completedTaskIds = new Set(
-            completedTasks
-                .filter(task => task.task_id !== null)
+        // Tasks completed anytime
+        const completedEverTaskIds = new Set(
+            allCompletedTaskIds
+                .filter(task => task.task_id != null)
                 .map(task => task.task_id)
         );
 
@@ -152,14 +167,13 @@ export const getPatientDailyReport = async (req, res) => {
 
                 // Daily/Routine
                 if (category === "Daily_Routine") {
-                    return !completedAssignmentIds.has(task.assignment_id);
+                    return !completedTodayTaskIds.has(task.task_id);
                 }
 
-                // Periodic & Unplanned/As Required
-                return !completedTaskIds.has(task.task_id);
+                // Periodic & Unplanned
+                return !completedEverTaskIds.has(task.task_id);
             })
             : [];
-        // ✅ FORMAT RESPONSE
         const completedReport = completedTasks.map((task) => ({
 
             completed_task_id: task.completed_task_id,
