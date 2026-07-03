@@ -100,7 +100,6 @@ export const getPatientDailyReport = async (req, res) => {
             ? prisma.task_assignments.findMany({
                 where: {
                     patient_id: Number(patient_id),
-                    status: "pending",
                 },
 
                 include: {
@@ -128,11 +127,19 @@ export const getPatientDailyReport = async (req, res) => {
             })
             : Promise.resolve([]);
 
+
+
         const [completedTasks, pendingTasks] = await Promise.all([
             completedTasksPromise,
             pendingTasksPromise,
         ]);
+        const completedTaskIds = new Set(
+            completedTasks.map(task => task.task_id)
+        );
 
+        const actualPendingTasks = returnPending
+            ? pendingTasks.filter(task => !completedTaskIds.has(task.task_id))
+            : [];
 
         // ✅ FORMAT RESPONSE
         const completedReport = completedTasks.map((task) => ({
@@ -176,7 +183,7 @@ export const getPatientDailyReport = async (req, res) => {
                     : null,
         }));
 
-        const pendingReport = pendingTasks.map((task) => ({
+        const pendingReport = actualPendingTasks.map((task) => ({
             completed_task_id: null,
 
             assignment_id: task.assignment_id,
@@ -192,7 +199,7 @@ export const getPatientDailyReport = async (req, res) => {
             scheduled_time:
                 task.care_tasks?.scheduled_time ?? null,
 
-            status: task.status,
+            status: "pending",
 
             completed_at: null,
 
