@@ -229,15 +229,14 @@ model scheduler_state {
 
 model otp_verifications {
   id         Int      @id @default(autoincrement())
-  phone      String   @db.VarChar(20)
+  phone      String   @unique @db.VarChar(20)
   otp        String   @db.VarChar(10)
   expires_at DateTime
   created_at DateTime @default(now())
-  used       Boolean  @default(false)
 
-  @@index([phone])
-  @@index([phone, created_at])
+  @@index([expires_at])
 }
+
 
 model family_lead_contacts {
   id Int @id @default(autoincrement())
