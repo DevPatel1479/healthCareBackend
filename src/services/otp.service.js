@@ -52,7 +52,7 @@ export const verifyOTP = async (phone, otp) => {
       phone,
     },
   });
-
+  
   if (!record) {
     return {
       valid: false,

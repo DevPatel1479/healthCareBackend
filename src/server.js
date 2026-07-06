@@ -29,7 +29,7 @@ let io = null;
 
 if (!process.env.VERCEL) {
   const server = http.createServer(app);
-
+  
   io = new Server(server, {
     cors: {
       origin: '*',

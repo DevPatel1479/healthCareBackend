@@ -16,6 +16,16 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+
+const healthCheck = (req, res) => {
+    res.status(200).json({
+        message: 'Server is running',
+        timestamp: new Date()
+    });
+}
+
+
+app.get('/health', healthCheck);
 app.use('/api/users', userRoutes)
 app.use('/api', otpRoutes);
 app.use('/api', caregiverRoutes);
