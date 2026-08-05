@@ -12,6 +12,18 @@ import systemRoutes from './routes/system.routes.js';
 import uploadRoutes from "./routes/file.upload.routes.js";
 
 
+// V2 routes
+
+import userV2Routes from "./routes/v2/user.routes.js";
+import otpV2Routes from "./routes/v2/otp.routes.js";
+import caregiverV2Routes from "./routes/v2/caregiver.routes.js";
+import patientV2Routes from "./routes/v2/patient.routes.js";
+import taskAssignmentV2Routes from "./routes/v2/task_assignment.routes.js";
+import loginV2Routes from "./routes/v2/login.routes.js";
+import systemV2Routes from "./routes/v2/system.routes.js";
+import uploadV2Routes from "./routes/v2/file.upload.routes.js";
+
+
 const app = express()
 
 app.use(cors())
@@ -26,8 +38,17 @@ const healthCheck = (req, res) => {
     });
 }
 
-
 app.get('/health', healthCheck);
+
+/*
+ * =========================================================
+ * Legacy API
+ * =========================================================
+ * Existing endpoints.
+ * Do not modify these routes while introducing API v2.
+ */
+
+
 app.use('/api/users', userRoutes)
 app.use('/api', otpRoutes);
 app.use('/api', caregiverRoutes);
@@ -37,7 +58,28 @@ app.use('/api', loginRoutes);
 app.use('/api/system', systemRoutes);
 app.use("/api", uploadRoutes);
 
+
+/*
+ * =========================================================
+ * API V2
+ * =========================================================
+ * New RESTful and versioned API endpoints.
+ */
+
+app.use("/api/v2/users", userV2Routes);
+app.use("/api/v2", otpV2Routes);
+app.use("/api/v2", caregiverV2Routes);
+app.use("/api/v2", patientV2Routes);
+app.use("/api/v2/admin", taskAssignmentV2Routes);
+app.use("/api/v2", loginV2Routes);
+app.use("/api/v2/system", systemV2Routes);
+app.use("/api/v2", uploadV2Routes);
+
+
+
 app.use(errorHandler)
+
+
 
 
 export default app
