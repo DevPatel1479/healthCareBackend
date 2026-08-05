@@ -7,7 +7,11 @@ import { getAllCaregivers } from '../../controllers/caregiver/get.all.caregivers
 import { getCaregiverOverallReport, getCaregiverPatientWiseReport } from '../../controllers/caregiver/caregiver.report.controller.js';
 import { getCaregiverDetails } from '../../controllers/caregiver/get.caregiver.details.controller.js';
 import { verifyCaregiverQr } from '../../controllers/caregiver/verify.caregiver.controller.js';
+import { authMiddleware } from '../../middlewares/auth.middleware.js';
+
 const router = express.Router()
+
+router.use(authMiddleware);
 
 router.get("/caregiver/:id/tasks", getCaregiverTasks);
 router.patch("/tasks/update-status", updateTaskStatus);

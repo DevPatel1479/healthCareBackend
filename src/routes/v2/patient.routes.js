@@ -9,9 +9,11 @@ import { getPatientDetails } from '../../controllers/patient/get.patient.details
 import { getPatientQrCode } from '../../controllers/patient/patient.qr.controller.js';
 import { getFamilyLeadContacts } from '../../controllers/patient/patient.family.leads..controller.js';
 
+import { authMiddleware } from '../../middlewares/auth.middleware.js';
+
 const router = express.Router()
 
-
+router.use(authMiddleware);
 
 
 router.get("/patient/:id/tasks", getPatientTasks);
