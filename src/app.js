@@ -68,11 +68,11 @@ app.use("/api", uploadRoutes);
 
 
 app.use("/api/v2", otpV2Routes);
+app.use("/api/v2", loginV2Routes);
+app.use("/api/v2/admin", taskAssignmentV2Routes);
+app.use("/api/v2/system", systemV2Routes);
 app.use("/api/v2", caregiverV2Routes);
 app.use("/api/v2", patientV2Routes);
-app.use("/api/v2/admin", taskAssignmentV2Routes);
-app.use("/api/v2", loginV2Routes);
-app.use("/api/v2/system", systemV2Routes);
 app.use("/api/v2", uploadV2Routes);
 
 
