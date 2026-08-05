@@ -14,7 +14,7 @@ import uploadRoutes from "./routes/file.upload.routes.js";
 
 // V2 routes
 
-import userV2Routes from "./routes/v2/user.routes.js";
+
 import otpV2Routes from "./routes/v2/otp.routes.js";
 import caregiverV2Routes from "./routes/v2/caregiver.routes.js";
 import patientV2Routes from "./routes/v2/patient.routes.js";
@@ -66,7 +66,7 @@ app.use("/api", uploadRoutes);
  * New RESTful and versioned API endpoints.
  */
 
-app.use("/api/v2/users", userV2Routes);
+
 app.use("/api/v2", otpV2Routes);
 app.use("/api/v2", caregiverV2Routes);
 app.use("/api/v2", patientV2Routes);
