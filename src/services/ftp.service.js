@@ -1,26 +1,14 @@
-import ftp from "basic-ftp";
-import { Readable } from "stream";
+import fs from "fs/promises";
+import path from "path";
 
 export const uploadToFTP = async (buffer, fileName) => {
-    const client = new ftp.Client();
+    const uploadDir = path.join(process.cwd(), "uploads");
 
-    try {
-        await client.access({
-            host: process.env.FTP_HOST,
-            user: process.env.FTP_USER,
-            password: process.env.FTP_PASSWORD,
-            secure: false,
-        });
+    await fs.mkdir(uploadDir, { recursive: true });
 
-        await client.ensureDir("/uploads");
+    const filePath = path.join(uploadDir, fileName);
 
-        await client.uploadFrom(
-            Readable.from(buffer),
-            `/uploads/${fileName}`
-        );
+    await fs.writeFile(filePath, buffer);
 
-        return `${process.env.FILE_BASE_URL}/${fileName}`;
-    } finally {
-        client.close();
-    }
+    return `${process.env.FILE_BASE_URL}/${fileName}`;
 };
