@@ -1,3 +1,4 @@
+
 // controllers/patient/refresh.caregiver.controller.js
 
 import prisma from "../../lib/prisma.js";
@@ -71,11 +72,18 @@ const resolveShiftName = (startTime, endTime) => {
 
 /**
  * Get today's date at local midnight.
+ *
+ * assignment_date is MySQL DATE through Prisma DateTime @db.Date.
  */
 const getToday = () => {
-    return new Date();
+    const today = new Date();
 
+    today.setHours(0, 0, 0, 0);
+
+    return today;
 };
+
+
 /**
  * GET /api/patient/refresh-caregiver
  *
@@ -85,28 +93,23 @@ const getToday = () => {
  * 2. Find patient
  * 3. Call external API FIRST
  * 4. Get first external record
- * 5. Get first caregiver
- * 6. Check local DB
- * 7. If today's caregiver assignment exists -> return it
- * 8. Otherwise create caregiver + master + shift
- * 9. Return caregiver
+ * 5. Get current caregiver from external API
+ * 6. Resolve/create local caregiver
+ * 7. Check today's local assignment
+ * 8. If same caregiver -> keep assignment
+ * 9. If different caregiver -> UPDATE today's assignment
+ * 10. If no assignment -> CREATE today's assignment
+ * 11. Return CURRENT caregiver
  */
 export const refreshCaregiverController = async (req, res) => {
     try {
-        /**
-         * =========================================================
-         * 1. GET AUTHENTICATED USER
-         * =========================================================
-         *
-         * DO NOT take userId from req.body.
-         *
-         * authMiddleware should decode the JWT and put the user
-         * information inside req.user.
-         */
+
+        // =========================================================
+        // 1. GET AUTHENTICATED USER
+        // =========================================================
 
         const userId = req.user?.user_id;
 
-        console.log(userId);
         if (!userId) {
             return res.status(401).json({
                 success: false,
@@ -115,13 +118,10 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 2. FIND PATIENT
-         * =========================================================
-         *
-         * patients.family_lead_id -> users.user_id
-         */
+        // =========================================================
+        // 2. FIND PATIENT
+        // =========================================================
+
         const patient = await prisma.patients.findFirst({
             where: {
                 family_lead_id: userId,
@@ -149,11 +149,10 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 3. PHONE NUMBER
-         * =========================================================
-         */
+        // =========================================================
+        // 3. PHONE NUMBER
+        // =========================================================
+
         const phoneNumber = patient.users?.phone_number;
 
         if (!phoneNumber) {
@@ -164,11 +163,10 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 4. CALL EXTERNAL API FIRST
-         * =========================================================
-         */
+        // =========================================================
+        // 4. CALL EXTERNAL API FIRST
+        // =========================================================
+
         const currentDate = new Date().toLocaleDateString("en-CA", {
             timeZone: "Asia/Kolkata",
         });
@@ -184,14 +182,16 @@ export const refreshCaregiverController = async (req, res) => {
                 },
                 {
                     headers: {
-                        Authorization: `Bearer ${EXTERNAL_API_TOKEN}`,
+                        Authorization: `Bearer ${EXTERNAL_API_TOKEN} `,
                         "Content-Type": "application/json",
                     },
 
                     timeout: 8000,
                 }
             );
+
         } catch (apiError) {
+
             const responseData = apiError?.response?.data;
 
             console.error(
@@ -218,11 +218,10 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 5. VALIDATE EXTERNAL RESPONSE
-         * =========================================================
-         */
+        // =========================================================
+        // 5. VALIDATE EXTERNAL RESPONSE
+        // =========================================================
+
         const externalData = externalResponse.data;
 
         if (
@@ -237,18 +236,17 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 6. FIRST RECORD
-         * =========================================================
-         */
+        // =========================================================
+        // 6. FIRST EXTERNAL RECORD
+        // =========================================================
+
         const record = externalData.records[0];
 
 
-        /**
-         * Make sure the external patient matches
-         * our logged-in patient.
-         */
+        // =========================================================
+        // 7. VALIDATE EXTERNAL PATIENT
+        // =========================================================
+
         if (
             patient.external_patient_id &&
             Number(record.patient_id) !==
@@ -261,21 +259,18 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 7. FIRST CAREGIVER
-         * =========================================================
-         */
+        // =========================================================
+        // 8. GET CURRENT EXTERNAL CAREGIVER
+        // =========================================================
+
         const caregiverData = record.caregivers?.[0];
 
 
-        /**
-         * No caregiver currently assigned.
-         */
         if (!caregiverData) {
             return res.status(404).json({
                 success: false,
                 message: "No caregiver is currently assigned",
+
                 data: {
                     caregiver: null,
                 },
@@ -283,9 +278,10 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * Validate caregiver information.
-         */
+        // =========================================================
+        // 9. VALIDATE CAREGIVER DATA
+        // =========================================================
+
         if (
             !caregiverData.caregiver_id ||
             !caregiverData.caregiver_name ||
@@ -298,86 +294,47 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 8. TODAY
-         * =========================================================
-         */
+        // =========================================================
+        // 10. TODAY
+        // =========================================================
 
         const today = getToday();
-        today.setHours(0, 0, 0, 0);
 
 
+        console.log("=================================");
+        console.log(
+            "Current IST date:",
+            new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Kolkata",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            }).format(new Date())
+        );
 
-        /**
-         * =========================================================
-         * 9. CHECK EXISTING PATIENT ASSIGNMENT
-         * =========================================================
-         *
-         * IMPORTANT:
-         *
-         * We check AFTER external API, as requested.
-         *
-         * We only care whether the patient already has a caregiver
-         * assignment today.
-         */
+        console.log(
+            "Date being sent to Prisma:",
+            today
+        );
 
+        console.log(
+            "Date being stored:",
+            today.toISOString().slice(0, 10)
+        );
 
-        const existingAssignment =
-            await prisma.caregiver_shifts.findFirst({
-                where: {
-                    patient_id: patient.patient_id,
-                    assignment_date: today
-                },
+        console.log("External caregiver:", {
+            id: caregiverData.caregiver_id,
+            name: caregiverData.caregiver_name,
+            phone: caregiverData.caregiver_phone,
+        });
 
-                orderBy: {
-                    shift_assignment_id: "asc",
-                },
-
-                select: {
-                    caregiver_id: true,
-
-                    users: {
-                        select: {
-                            user_id: true,
-                            full_name: true,
-                            phone_number: true,
-                        },
-                    },
-                },
-            });
+        console.log("=================================");
 
 
-        /**
-         * =========================================================
-         * 10. ALREADY ASSIGNED
-         * =========================================================
-         */
-        if (existingAssignment?.users) {
-            return res.status(200).json({
-                success: true,
-                message: "Caregiver found",
-                data: {
-                    caregiver: {
-                        caregiver_id:
-                            existingAssignment.users.user_id,
+        // =========================================================
+        // 11. RESOLVE SHIFT
+        // =========================================================
 
-                        name:
-                            existingAssignment.users.full_name,
-
-                        phone_number:
-                            existingAssignment.users.phone_number,
-                    },
-                },
-            });
-        }
-
-
-        /**
-         * =========================================================
-         * 11. RESOLVE SHIFT BEFORE TRANSACTION
-         * =========================================================
-         */
         const shiftName = resolveShiftName(
             caregiverData.service_starttime,
             caregiverData.service_endtime
@@ -399,16 +356,15 @@ export const refreshCaregiverController = async (req, res) => {
             return res.status(500).json({
                 success: false,
                 message:
-                    `Caregiver shift configuration is missing: ${shiftName}`,
+                    `Caregiver shift configuration is missing: ${shiftName} `,
             });
         }
 
 
-        /**
-         * =========================================================
-         * 12. PARSE DATES
-         * =========================================================
-         */
+        // =========================================================
+        // 12. PARSE SERVICE DATES
+        // =========================================================
+
         const startDateTime = parseDateTime(
             caregiverData.service_startdate,
             caregiverData.service_starttime
@@ -428,32 +384,17 @@ export const refreshCaregiverController = async (req, res) => {
         }
 
 
-        /**
-         * =========================================================
-         * 13. CREATE / FIND CAREGIVER
-         * =========================================================
-         */
+        // =========================================================
+        // 13. TRANSACTION
+        // =========================================================
 
-
-        console.log("=================================");
-        console.log("Current IST date:", new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Kolkata",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-        }).format(new Date()));
-
-        console.log("Date being sent to Prisma:", today);
-        console.log("Date being stored:", today.toISOString().slice(0, 10));
-        console.log("=================================");
         const result = await prisma.$transaction(
             async (tx) => {
 
-                /**
-                 * ---------------------------------------------
-                 * CAREGIVER USER
-                 * ---------------------------------------------
-                 */
+                // -------------------------------------------------
+                // A. FIND OR CREATE LOCAL CAREGIVER
+                // -------------------------------------------------
+
                 let caregiver = await tx.users.findFirst({
                     where: {
                         phone_number:
@@ -489,14 +430,22 @@ export const refreshCaregiverController = async (req, res) => {
                             phone_number: true,
                         },
                     });
+
+                    console.log(
+                        "Created new local caregiver:",
+                        caregiver.user_id
+                    );
                 }
 
 
-                /**
-                 * ---------------------------------------------
-                 * CAREGIVER MASTER
-                 * ---------------------------------------------
-                 */
+                // -------------------------------------------------
+                // B. CREATE OR UPDATE CAREGIVER MASTER
+                // -------------------------------------------------
+
+                const externalCaregiverId =
+                    Number(caregiverData.caregiver_id);
+
+
                 const existingMaster =
                     await tx.caregiver_master.findUnique({
                         where: {
@@ -512,15 +461,33 @@ export const refreshCaregiverController = async (req, res) => {
 
 
                 if (!existingMaster) {
+
                     await tx.caregiver_master.create({
                         data: {
                             caregiver_id:
                                 caregiver.user_id,
 
                             external_caregiver_id:
-                                Number(
-                                    caregiverData.caregiver_id
-                                ),
+                                externalCaregiverId,
+
+                            is_active: true,
+                        },
+                    });
+
+                } else if (
+                    Number(existingMaster.external_caregiver_id) !==
+                    externalCaregiverId
+                ) {
+
+                    await tx.caregiver_master.update({
+                        where: {
+                            caregiver_id:
+                                caregiver.user_id,
+                        },
+
+                        data: {
+                            external_caregiver_id:
+                                externalCaregiverId,
 
                             is_active: true,
                         },
@@ -528,54 +495,55 @@ export const refreshCaregiverController = async (req, res) => {
                 }
 
 
-                /**
-                 * ---------------------------------------------
-                 * CREATE SHIFT ASSIGNMENT
-                 * ---------------------------------------------
-                 *
-                 * Your Prisma schema has:
-                 *
-                 * @@unique([
-                 *   patient_id,
-                 *   caregiver_id,
-                 *   shift_id,
-                 *   assignment_date
-                 * ])
-                 *
-                 * Prisma therefore generates this compound
-                 * unique selector:
-                 *
-                 * patient_id_caregiver_id_shift_id_assignment_date
-                 */
-                const assignment =
-                    await tx.caregiver_shifts.upsert({
+                // -------------------------------------------------
+                // C. FIND TODAY'S EXISTING ASSIGNMENT
+                // -------------------------------------------------
+
+                const existingAssignment =
+                    await tx.caregiver_shifts.findFirst({
                         where: {
-                            patient_id_caregiver_id_shift_id_assignment_date:
-                            {
-                                patient_id:
-                                    patient.patient_id,
+                            patient_id:
+                                patient.patient_id,
 
-                                caregiver_id:
-                                    caregiver.user_id,
-
-                                shift_id:
-                                    shift.shift_id,
-
-                                assignment_date:
-                                    today,
-                            },
+                            assignment_date:
+                                today,
                         },
 
-                        /**
-                         * If another request already created
-                         * the exact same assignment, don't modify it.
-                         */
-                        update: {},
+                        orderBy: {
+                            shift_assignment_id:
+                                "asc",
+                        },
 
-                        /**
-                         * Otherwise create it.
-                         */
-                        create: {
+                        select: {
+                            shift_assignment_id: true,
+
+                            caregiver_id: true,
+
+                            shift_id: true,
+
+                            users: {
+                                select: {
+                                    user_id: true,
+                                    full_name: true,
+                                    phone_number: true,
+                                },
+                            },
+                        },
+                    });
+
+
+                // -------------------------------------------------
+                // D. NO ASSIGNMENT TODAY
+                // -------------------------------------------------
+
+                if (!existingAssignment) {
+
+                    console.log(
+                        "No caregiver assignment found for today."
+                    );
+
+                    await tx.caregiver_shifts.create({
+                        data: {
                             patient_id:
                                 patient.patient_id,
 
@@ -600,12 +568,102 @@ export const refreshCaregiverController = async (req, res) => {
                             verified:
                                 true,
                         },
-
-                        select: {
-                            shift_assignment_id: true,
-                        },
                     });
 
+                    console.log(
+                        "Created today's caregiver assignment:",
+                        caregiver.user_id
+                    );
+
+                    return caregiver;
+                }
+
+
+                // -------------------------------------------------
+                // E. SAME CAREGIVER
+                // -------------------------------------------------
+
+                if (
+                    existingAssignment.caregiver_id ===
+                    caregiver.user_id
+                ) {
+
+                    console.log(
+                        "Same caregiver already assigned:",
+                        caregiver.user_id
+                    );
+
+                    return caregiver;
+                }
+
+
+                // -------------------------------------------------
+                // F. DIFFERENT CAREGIVER
+                // -------------------------------------------------
+
+                console.log(
+                    "Caregiver changed!"
+                );
+
+                console.log(
+                    "Old local caregiver:",
+                    existingAssignment.caregiver_id
+                );
+
+                console.log(
+                    "New local caregiver:",
+                    caregiver.user_id
+                );
+
+
+                // IMPORTANT:
+                //
+                // We UPDATE today's assignment rather than returning
+                // the old caregiver.
+                //
+                // This makes createPatientTask find the NEW caregiver
+                // when it queries today's active caregiver shift.
+
+                await tx.caregiver_shifts.update({
+                    where: {
+                        shift_assignment_id:
+                            existingAssignment.shift_assignment_id,
+                    },
+
+                    data: {
+                        caregiver_id:
+                            caregiver.user_id,
+
+                        shift_id:
+                            shift.shift_id,
+
+                        start_time:
+                            startDateTime,
+
+                        end_time:
+                            endDateTime,
+
+                        verified:
+                            true,
+                    },
+                });
+
+
+                console.log(
+                    "Updated today's caregiver assignment."
+                );
+
+                console.log(
+                    "New caregiver:",
+                    caregiver.user_id
+                );
+
+
+                // VERY IMPORTANT:
+                //
+                // Return the NEW caregiver.
+                //
+                // Do NOT return existingAssignment.users here.
 
                 return caregiver;
             },
@@ -617,14 +675,14 @@ export const refreshCaregiverController = async (req, res) => {
         );
 
 
-        /**
-         * =========================================================
-         * 14. RETURN CAREGIVER
-         * =========================================================
-         */
+        // =========================================================
+        // 14. ALWAYS RETURN CURRENT CAREGIVER
+        // =========================================================
+
         return res.status(200).json({
             success: true,
-            message: "Caregiver found successfully",
+
+            message: "Caregiver refreshed successfully",
 
             data: {
                 caregiver: {
@@ -648,24 +706,14 @@ export const refreshCaregiverController = async (req, res) => {
         );
 
 
-        /**
-         * =========================================================
-         * HANDLE CONCURRENT REQUEST
-         * =========================================================
-         *
-         * Example:
-         *
-         * Refresh #1 -> INSERT
-         * Refresh #2 -> INSERT
-         *
-         * Refresh #2 gets P2002.
-         *
-         * Instead of returning an error to the patient,
-         * retrieve the assignment that Refresh #1 just created.
-         */
+        // =========================================================
+        // HANDLE CONCURRENT REQUEST
+        // =========================================================
+
         if (error?.code === "P2002") {
 
             try {
+
                 const userId = req.user?.user_id;
 
                 if (!userId) {
@@ -711,7 +759,8 @@ export const refreshCaregiverController = async (req, res) => {
                         },
 
                         orderBy: {
-                            shift_assignment_id: "asc",
+                            shift_assignment_id:
+                                "asc",
                         },
 
                         select: {
@@ -727,9 +776,12 @@ export const refreshCaregiverController = async (req, res) => {
 
 
                 if (assignment?.users) {
+
                     return res.status(200).json({
                         success: true,
-                        message: "Caregiver found",
+
+                        message:
+                            "Caregiver found",
 
                         data: {
                             caregiver: {
@@ -747,6 +799,7 @@ export const refreshCaregiverController = async (req, res) => {
                 }
 
             } catch (raceError) {
+
                 console.error(
                     "Concurrent assignment recovery failed:",
                     raceError
@@ -756,6 +809,7 @@ export const refreshCaregiverController = async (req, res) => {
 
             return res.status(409).json({
                 success: false,
+
                 message:
                     "Caregiver assignment already exists",
             });
@@ -764,8 +818,10 @@ export const refreshCaregiverController = async (req, res) => {
 
         return res.status(500).json({
             success: false,
+
             message:
                 "Failed to refresh caregiver information",
         });
     }
 };
+
