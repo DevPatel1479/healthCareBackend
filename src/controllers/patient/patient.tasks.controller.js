@@ -418,6 +418,8 @@ export const createPatientTask = async (req, res) => {
 
 
     const today = getTodayDateOnly();
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     // ✅ Parallel queries (FASTER)
     const [patient, activeShift] = await Promise.all([
@@ -437,13 +439,26 @@ export const createPatientTask = async (req, res) => {
           patient_id: numericPatientId,
           // end_time: null,
           verified: true,
-          assignment_date: today,
+          // ✅ FIX: timezone-safe date range
+          assignment_date: {
+            gte: today,
+            lt: tomorrow,
+          },
+
+          // ✅ Keep the OLD behavior:
+          // shift must already have started
           start_time: {
             lte: now,
           },
           OR: [
-            { end_time: null },
-            { end_time: { gte: now } },
+            {
+              end_time: null,
+            },
+            {
+              end_time: {
+                gte: now,
+              },
+            },
           ],
         },
 
