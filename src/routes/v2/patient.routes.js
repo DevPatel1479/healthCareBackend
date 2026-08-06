@@ -9,6 +9,7 @@ import { getPatientDetails } from '../../controllers/patient/get.patient.details
 import { getPatientQrCode } from '../../controllers/patient/patient.qr.controller.js';
 import { getFamilyLeadContacts } from '../../controllers/patient/patient.family.leads..controller.js';
 
+import { refreshCaregiverController } from '../../controllers/patient/refresh.caregiver.controller.js';
 import { authMiddleware } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router()
@@ -29,6 +30,12 @@ router.get(
 );
 
 router.get("/patient/:patient_id/family-contacts", getFamilyLeadContacts);
+
+
+router.get(
+    "/patient/refresh-caregiver",
+    refreshCaregiverController
+);
 
 
 export default router
