@@ -185,9 +185,9 @@ export const refreshCaregiverController = async (req, res) => {
          * 4. CALL EXTERNAL API FIRST
          * =========================================================
          */
-        const currentDate = new Date()
-            .toISOString()
-            .split("T")[0];
+        const currentDate = new Date().toLocaleDateString("en-CA", {
+            timeZone: "Asia/Kolkata",
+        });
 
         let externalResponse;
 
