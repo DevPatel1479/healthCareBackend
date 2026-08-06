@@ -73,32 +73,8 @@ const resolveShiftName = (startTime, endTime) => {
  * Get today's date at local midnight.
  */
 const getToday = () => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).formatToParts(new Date());
+    return new Date();
 
-    const year = Number(
-        parts.find(p => p.type === "year").value
-    );
-
-    const month = Number(
-        parts.find(p => p.type === "month").value
-    );
-
-    const day = Number(
-        parts.find(p => p.type === "day").value
-    );
-
-    // IMPORTANT:
-    // Use UTC midnight for the IST calendar date.
-    // MySQL assignment_date is DATE, so only YYYY-MM-DD
-    // will be stored.
-    return new Date(
-        Date.UTC(year, month - 1, day)
-    );
 };
 /**
  * GET /api/patient/refresh-caregiver
@@ -329,6 +305,7 @@ export const refreshCaregiverController = async (req, res) => {
          */
 
         const today = getToday();
+        today.setHours(0, 0, 0, 0);
 
 
 
