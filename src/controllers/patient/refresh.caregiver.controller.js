@@ -73,25 +73,19 @@ const resolveShiftName = (startTime, endTime) => {
  * Get today's date at local midnight.
  */
 const getToday = () => {
-    const now = new Date();
-
-    const istString = now.toLocaleDateString("en-CA", {
+    const parts = new Intl.DateTimeFormat("en", {
         timeZone: "Asia/Kolkata",
-    });
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(new Date());
 
-    const [year, month, day] = istString
-        .split("-")
-        .map(Number);
+    const year = parts.find(p => p.type === "year").value;
+    const month = parts.find(p => p.type === "month").value;
+    const day = parts.find(p => p.type === "day").value;
 
-    return new Date(
-        Date.UTC(
-            year,
-            month - 1,
-            day
-        )
-    );
+    return `${year}-${month}-${day}`;
 };
-
 /**
  * GET /api/patient/refresh-caregiver
  *
@@ -322,12 +316,7 @@ export const refreshCaregiverController = async (req, res) => {
 
         const today = getToday();
 
-        const startOfDay = getToday();
 
-        const endOfDay = new Date(startOfDay);
-        endOfDay.setDate(
-            endOfDay.getDate() + 1
-        );
 
         /**
          * =========================================================
@@ -347,10 +336,7 @@ export const refreshCaregiverController = async (req, res) => {
             await prisma.caregiver_shifts.findFirst({
                 where: {
                     patient_id: patient.patient_id,
-                    assignment_date: {
-                        gte: startOfDay,
-                        lt: endOfDay
-                    }
+                    assignment_date: today
                 },
 
                 orderBy: {
@@ -456,11 +442,7 @@ export const refreshCaregiverController = async (req, res) => {
          * 13. CREATE / FIND CAREGIVER
          * =========================================================
          */
-        console.log({
-            today,
-            dateString: today.toISOString(),
-            localDate: today.toLocaleDateString(),
-        });
+        console.log("Current IST assignment date:", today);
         const result = await prisma.$transaction(
             async (tx) => {
 
