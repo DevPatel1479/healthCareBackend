@@ -1,5 +1,6 @@
 
 
+import { date } from "zod";
 import prisma from "../../lib/prisma.js";
 import { io } from "../../server.js";
 // import { assignTaskToCaregiver } from "../task_assignment/assign.task.controller.js";
@@ -102,6 +103,121 @@ const getTodayDateOnly = () => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 };
 
+/**
+ * Get IST date boundaries.
+ *
+ * If no date is provided:
+ *    uses today's IST date
+ *
+ * If date is provided:
+ *    expects YYYY-MM-DD
+ */
+const getDateBoundaries = (dateString) => {
+  let targetDate;
+
+  // -----------------------------------------
+  // No date => preserve existing behavior
+  // -----------------------------------------
+
+  if (!dateString) {
+    const nowIST = new Date(
+      new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+      })
+    );
+
+    const startOfDay = new Date(nowIST);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(nowIST);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return {
+      startOfDay,
+      endOfDay,
+
+      // IMPORTANT:
+      // preserve your original implementation
+      assignmentDate: getTodayDateOnly(),
+
+      selectedDate: new Date().toLocaleDateString(
+        "en-CA",
+        {
+          timeZone: "Asia/Kolkata",
+        }
+      ),
+    };
+  }
+
+  // -----------------------------------------
+  // Date provided
+  // -----------------------------------------
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+    dateString
+  );
+
+  if (!match) {
+    throw new Error(
+      "Invalid date format. Use YYYY-MM-DD"
+    );
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  // Validate date
+  const validationDate = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  if (
+    validationDate.getFullYear() !== year ||
+    validationDate.getMonth() !== month - 1 ||
+    validationDate.getDate() !== day
+  ) {
+    throw new Error("Invalid date");
+  }
+
+  // -----------------------------------------
+  // For requested historical date
+  // -----------------------------------------
+
+  const startOfDay = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // Preserve same Date behavior as your
+  // original getTodayDateOnly()
+  const assignmentDate = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  return {
+    startOfDay,
+    endOfDay,
+    assignmentDate,
+    selectedDate: dateString,
+  };
+};
+
 export const getPatientTasks = async (req, res) => {
   try {
     const patientId = Number(req.params.id);
@@ -113,19 +229,62 @@ export const getPatientTasks = async (req, res) => {
       });
     }
 
-    // IST date boundaries
-    const nowIST = new Date(
-      new Date().toLocaleString("en-US", {
-        timeZone: "Asia/Kolkata",
-      })
-    );
-    const now = new Date();
-    const startOfDay = new Date(nowIST);
-    startOfDay.setHours(0, 0, 0, 0);
+    const requestedDate = req.query.date;
 
-    const endOfDay = new Date(nowIST);
-    endOfDay.setHours(23, 59, 59, 999);
-    const today = getTodayDateOnly();
+    if (
+      requestedDate !== undefined &&
+      typeof requestedDate !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Date must be in YYYY-MM-DD format",
+      });
+    }
+    let dateInfo;
+    // // IST date boundaries
+    // const nowIST = new Date(
+    //   new Date().toLocaleString("en-US", {
+    //     timeZone: "Asia/Kolkata",
+    //   })
+    // );
+    // const now = new Date();
+    // const startOfDay = new Date(nowIST);
+    // startOfDay.setHours(0, 0, 0, 0);
+
+    // const endOfDay = new Date(nowIST);
+    // endOfDay.setHours(23, 59, 59, 999);
+    // const today = getTodayDateOnly();
+
+    try {
+      dateInfo = getDateBoundaries(requestedDate);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    const {
+      startOfDay,
+      endOfDay,
+      assignmentDate,
+      selectedDate,
+    } = dateInfo;
+
+    // -----------------------------------------
+    // Is requested date today?
+    // -----------------------------------------
+
+    const todayIST = new Date().toLocaleDateString(
+      "en-CA",
+      {
+        timeZone: "Asia/Kolkata",
+      }
+    );
+
+    const isToday = selectedDate === todayIST;
+
+    const now = new Date();
     const [
       assignments,
       completedToday,
@@ -175,14 +334,32 @@ export const getPatientTasks = async (req, res) => {
         where: {
           patient_id: patientId,
           verified: true,
-          assignment_date: today,
-          start_time: {
-            lte: now,
-          },
-          OR: [
-            { end_time: null },
-            { end_time: { gte: now } },
-          ],
+          assignment_date: assignmentDate,
+          // start_time: {
+          //   lte: now,
+          // },
+          // OR: [
+          //   { end_time: null },
+          //   { end_time: { gte: now } },
+          // ],
+          ...(isToday
+            ? {
+              start_time: {
+                lte: now,
+              },
+
+              OR: [
+                {
+                  end_time: null,
+                },
+                {
+                  end_time: {
+                    gte: now,
+                  },
+                },
+              ],
+            }
+            : {}),
         },
 
         orderBy: {
@@ -238,7 +415,7 @@ export const getPatientTasks = async (req, res) => {
 
       return {
         assignment_id: assignment.assignment_id,
-
+        date: selectedDate,
         task_id: assignment.task_id,
 
         status: completedRow
