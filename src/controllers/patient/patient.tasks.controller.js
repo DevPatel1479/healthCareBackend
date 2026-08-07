@@ -379,12 +379,39 @@ export const getPatientTasks = async (req, res) => {
       }),
     ]);
 
+
     // task_id -> completion row
     // const completedMap = new Map();
 
     // completedToday.forEach((row) => {
     //   completedMap.set(row.task_id, row);
     // });
+
+    const filteredAssignments = assignments.filter(
+      (assignment) => {
+
+        const isDailyRoutine =
+          assignment.care_tasks?.task_category ===
+          "Daily_Routine";
+
+        // Daily routines keep existing behavior
+        if (isDailyRoutine) {
+          return true;
+        }
+
+        // For non-daily tasks:
+        // only show tasks that existed on
+        // or before the selected date.
+        if (
+          assignment.created_at &&
+          assignment.created_at > endOfDay
+        ) {
+          return false;
+        }
+
+        return true;
+      }
+    );
 
     const todayCompletedMap = new Map();
     const allCompletedMap = new Map();
@@ -403,7 +430,7 @@ export const getPatientTasks = async (req, res) => {
       }
     });
 
-    const result = assignments.map((assignment) => {
+    const result = filteredAssignments.map((assignment) => {
 
       const isDailyRoutine =
         assignment.care_tasks?.task_category ===
