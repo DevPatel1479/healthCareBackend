@@ -158,6 +158,126 @@ import prisma from "../../lib/prisma.js";
 // };
 
 
+const getTodayDateOnly = () => {
+  const d = new Date();
+
+  return new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate()
+  );
+};
+
+/**
+ * Get date boundaries.
+ *
+ * No date:
+ *   Uses today's IST date.
+ *
+ * Date provided:
+ *   Expects YYYY-MM-DD.
+ */
+const getDateBoundaries = (dateString) => {
+  // =========================================
+  // NO DATE
+  // Preserve existing TODAY behavior
+  // =========================================
+  if (!dateString) {
+    const nowIST = new Date(
+      new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+      })
+    );
+
+    const startOfDay = new Date(nowIST);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(nowIST);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return {
+      startOfDay,
+      endOfDay,
+
+      // Preserve original caregiver controller behavior
+      assignmentDate: getTodayDateOnly(),
+
+      selectedDate: new Date().toLocaleDateString(
+        "en-CA",
+        {
+          timeZone: "Asia/Kolkata",
+        }
+      ),
+    };
+  }
+
+  // =========================================
+  // DATE PROVIDED
+  // =========================================
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+    dateString
+  );
+
+  if (!match) {
+    throw new Error(
+      "Invalid date format. Use YYYY-MM-DD"
+    );
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  // =========================================
+  // VALIDATE DATE
+  // =========================================
+  const validationDate = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  if (
+    validationDate.getFullYear() !== year ||
+    validationDate.getMonth() !== month - 1 ||
+    validationDate.getDate() !== day
+  ) {
+    throw new Error("Invalid date");
+  }
+
+  // =========================================
+  // SELECTED DATE RANGE
+  // =========================================
+  const startOfDay = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const assignmentDate = new Date(
+    year,
+    month - 1,
+    day
+  );
+
+  return {
+    startOfDay,
+    endOfDay,
+    assignmentDate,
+    selectedDate: dateString,
+  };
+};
+
 
 export const getCaregiverTasks = async (req, res) => {
   try {
@@ -169,63 +289,137 @@ export const getCaregiverTasks = async (req, res) => {
         message: "Invalid caregiver id",
       });
     }
+    const requestedDate = req.query.date;
+    if (
+      requestedDate !== undefined &&
+      typeof requestedDate !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Date must be in YYYY-MM-DD format",
+      });
+    }
+
+    let dateInfo;
+    try {
+      dateInfo = getDateBoundaries(requestedDate);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    const {
+      startOfDay,
+      endOfDay,
+      assignmentDate,
+      selectedDate,
+    } = dateInfo;
+    // =========================================
+    // IS SELECTED DATE TODAY?
+    // =========================================
+
+    const todayIST = new Date().toLocaleDateString(
+      "en-CA",
+      {
+        timeZone: "Asia/Kolkata",
+      }
+    );
+
+    const isToday = selectedDate === todayIST;
 
     const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // const now = new Date();
+    // const today = new Date();
+    // today.setHours(0, 0, 0, 0);
     // ==================================
     // TODAY RANGE
     // ==================================
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
+    // const startOfDay = new Date(now);
+    // startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
+    // const endOfDay = new Date(now);
+    // endOfDay.setHours(23, 59, 59, 999);
 
     // ==================================
     // ACTIVE SHIFT
     // ==================================
-    const activeShift = await prisma.caregiver_shifts.findFirst({
-      where: {
-        caregiver_id: caregiverId,
-        verified: true,
-        assignment_date: today,
-        start_time: { lte: now },
-        OR: [
-          { end_time: null },
-          { end_time: { gte: now } },
-        ],
-      },
-      orderBy: {
-        start_time: "desc",
-      },
-      include: {
-        patients: {
-          include: {
-            users: {
-              select: {
-                user_id: true,
-                full_name: true,
-                phone_number: true,
+
+    // =========================================
+    // ACTIVE SHIFT
+    // =========================================
+
+    let activeShift = null;
+    /*
+        * IMPORTANT:
+        *
+        * For TODAY:
+        * preserve existing behavior:
+        *
+        * start_time <= now
+        *
+        * AND
+        *
+        * end_time >= now OR end_time is null
+        *
+        * For HISTORICAL DATE:
+        * do NOT apply the current-time conditions.
+        *
+        * We only need the verified shift assigned
+        * to that historical date.
+        */
+    if (isToday) {
+      activeShift = await prisma.caregiver_shifts.findFirst({
+        where: {
+          caregiver_id: caregiverId,
+          verified: true,
+          assignment_date: assignmentDate,
+          start_time: { lte: now },
+          OR: [
+            { end_time: null },
+            { end_time: { gte: now } },
+          ],
+        },
+        orderBy: {
+          start_time: "desc",
+        },
+        include: {
+          patients: {
+            include: {
+              users: {
+                select: {
+                  user_id: true,
+                  full_name: true,
+                  phone_number: true,
+                },
               },
             },
           },
+          shifts: true,
         },
-        shifts: true,
-      },
-    });
+      });
+
+    }
+
 
     // ==================================
     // FALLBACK SHIFT
     // ==================================
     let fallbackShift = null;
-
+    /*
+        * TODAY:
+        * If no active shift was found,
+        * preserve existing fallback behavior.
+        *
+        * HISTORICAL:
+        * Directly find the shift for that date.
+        */
     if (!activeShift) {
       fallbackShift = await prisma.caregiver_shifts.findFirst({
         where: {
           caregiver_id: caregiverId,
           verified: true,
-          assignment_date: today,
+          assignment_date: assignmentDate,
         },
         orderBy: {
           start_time: "desc",
@@ -260,15 +454,16 @@ export const getCaregiverTasks = async (req, res) => {
       }
       : null;
 
-    // ==================================
-    // GET MASTER TASKS
-    // ==================================
     if (!shiftToUse?.patients?.patient_id) {
       return res.status(404).json({
         success: false,
         message: "No patient assigned to caregiver",
       });
     }
+    // ==================================
+    // GET MASTER TASKS
+    // ==================================
+
     const assignments = await prisma.task_assignments.findMany({
       where: {
         patient_id: patientInfo?.patient_id,
@@ -287,6 +482,44 @@ export const getCaregiverTasks = async (req, res) => {
         assignment_id: "desc",
       },
     });
+
+    if (!shiftToUse?.patients?.patient_id) {
+      return res.status(404).json({
+        success: false,
+        message: "No patient assigned to caregiver",
+      });
+    }
+    const filteredAssignments =
+      assignments.filter((assignment) => {
+        const isDailyRoutine =
+          assignment.care_tasks?.task_category ===
+          "Daily_Routine";
+
+        // -----------------------------------------
+        // Daily routines:
+        // Preserve existing behavior
+        // -----------------------------------------
+        if (isDailyRoutine) {
+          return true;
+        }
+
+        // -----------------------------------------
+        // Non-daily tasks:
+        // Don't show tasks that didn't exist yet
+        // on the selected date.
+        // -----------------------------------------
+
+        if (
+          assignment.created_at &&
+          assignment.created_at > endOfDay
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+
+
     // ==================================
     // GET TODAY COMPLETIONS
     // ==================================
@@ -338,7 +571,7 @@ export const getCaregiverTasks = async (req, res) => {
     // ==================================
     // BUILD RESPONSE
     // ==================================
-    const result = assignments.map((a) => {
+    const result = filteredAssignments.map((a) => {
       const isDaily =
         a.care_tasks?.task_category === "Daily_Routine";
       const completedRecord = isDaily
@@ -349,6 +582,8 @@ export const getCaregiverTasks = async (req, res) => {
 
       return {
         assignment_id: a.assignment_id,
+
+        date: selectedDate,
 
         // TODAY'S STATUS
         status: completedRecord

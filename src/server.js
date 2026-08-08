@@ -63,7 +63,7 @@ if (!process.env.VERCEL) {
       "./services/dailyTaskScheduler.js"
     );
 
-      startDailyTaskScheduler();
+      // startDailyTaskScheduler();
     }
     
   });
