@@ -249,6 +249,16 @@ export const verifyCaregiverQr = async (req, res) => {
                 },
             });
 
+        const updatedTaskAssignments =
+            await prisma.task_assignments.updateMany({
+                where: {
+                    patient_id: Number(patient_id),
+                },
+                data: {
+                    caregiver_id: Number(caregiver_id),
+                },
+            });
+
         return res.status(200).json({
             success: true,
             message:
@@ -264,6 +274,11 @@ export const verifyCaregiverQr = async (req, res) => {
             shift_created: true,
 
             shift: newShift,
+
+            updated_caregiver_id: Number(caregiver_id),
+
+            task_assignments_updated:
+                updatedTaskAssignments.count,
         });
     } catch (error) {
         console.error(
