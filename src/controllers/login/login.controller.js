@@ -77,6 +77,163 @@ const resolveShiftName = (startTime, endTime) => {
     return "Full Day";
 };
 
+/**
+ * Find/sync caregiver using external_caregiver_id.
+ *
+ * external_caregiver_id is the stable identity from the external system.
+ * phone_number is treated as mutable data and is synchronized.
+ */
+
+
+const findOrCreateCaregiver = async (tx, caregiverData) => {
+    const externalCaregiverId = Number(
+        caregiverData.caregiver_id
+    );
+
+    const externalPhone =
+        caregiverData.caregiver_phone;
+
+    /**
+     * =========================================================
+     * 1. FIND CAREGIVER BY EXTERNAL CAREGIVER ID
+     * =========================================================
+     */
+    let caregiverMaster =
+        await tx.caregiver_master.findUnique({
+            where: {
+                external_caregiver_id:
+                    externalCaregiverId,
+            },
+        });
+
+    /**
+     * =========================================================
+     * 2. CAREGIVER ALREADY EXISTS
+     * =========================================================
+     */
+    if (caregiverMaster) {
+        let caregiver =
+            await tx.users.findUnique({
+                where: {
+                    user_id:
+                        caregiverMaster.caregiver_id,
+                },
+            });
+
+        if (!caregiver) {
+            throw new Error(
+                `Caregiver user not found for external caregiver ID ${externalCaregiverId}`
+            );
+        }
+
+        /**
+         * If external API phone number changed,
+         * update the existing local user.
+         */
+        if (
+            caregiver.phone_number !==
+            externalPhone
+        ) {
+            caregiver =
+                await tx.users.update({
+                    where: {
+                        user_id:
+                            caregiver.user_id,
+                    },
+                    data: {
+                        phone_number:
+                            externalPhone,
+                    },
+                });
+        }
+
+        // /**
+        //  * Keep caregiver name synchronized as well.
+        //  */
+        // if (
+        //     caregiverData.caregiver_name &&
+        //     caregiver.full_name !==
+        //     caregiverData.caregiver_name
+        // ) {
+        //     caregiver =
+        //         await tx.users.update({
+        //             where: {
+        //                 user_id:
+        //                     caregiver.user_id,
+        //             },
+        //             data: {
+        //                 full_name:
+        //                     caregiverData.caregiver_name,
+        //             },
+        //         });
+        // }
+
+        return caregiver;
+    }
+
+    /**
+     * =========================================================
+     * 3. EXTERNAL CAREGIVER ID NOT FOUND
+     * =========================================================
+     *
+     * This is a NEW caregiver from the external system.
+     *
+     * Before creating a new users record, check whether
+     * the phone already exists locally.
+     */
+    let caregiver =
+        await tx.users.findFirst({
+            where: {
+                phone_number:
+                    externalPhone,
+                role: "caregiver",
+            },
+        });
+
+    /**
+     * =========================================================
+     * 4. CREATE CAREGIVER USER IF NOT FOUND
+     * =========================================================
+     */
+    if (!caregiver) {
+        caregiver =
+            await tx.users.create({
+                data: {
+                    role: "caregiver",
+
+                    full_name:
+                        caregiverData.caregiver_name,
+
+                    phone_number:
+                        externalPhone,
+
+                    is_verified: true,
+                },
+            });
+    }
+
+    /**
+     * =========================================================
+     * 5. CREATE CAREGIVER MASTER
+     * =========================================================
+     */
+    caregiverMaster =
+        await tx.caregiver_master.create({
+            data: {
+                caregiver_id:
+                    caregiver.user_id,
+
+                external_caregiver_id:
+                    externalCaregiverId,
+
+                is_active: true,
+            },
+        });
+
+    return caregiver;
+};
+
+
 export const loginController = async (req, res) => {
     try {
         const { phone_number } = req.body;
@@ -127,6 +284,7 @@ export const loginController = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (!user) {
+            let loggedInUserId = null;
             const currentDate = new Date()
                 .toISOString()
                 .split("T")[0];
@@ -221,7 +379,7 @@ export const loginController = async (req, res) => {
                                 },
                             });
                         }
-
+                        loggedInUserId = familyLead.user_id;
                         /**
                          * -----------------------------------------------------
                          * FAMILY LEAD CONTACT
@@ -312,55 +470,10 @@ export const loginController = async (req, res) => {
                              * CAREGIVER USER
                              */
 
-                            let caregiver =
-                                await tx.users.findFirst({
-                                    where: {
-                                        phone_number:
-                                            caregiverData.caregiver_phone,
-                                    },
-                                });
-
-                            if (!caregiver) {
-                                caregiver =
-                                    await tx.users.create({
-                                        data: {
-                                            role: "caregiver",
-                                            full_name:
-                                                caregiverData.caregiver_name,
-                                            phone_number:
-                                                caregiverData.caregiver_phone,
-                                            is_verified: true,
-                                        },
-                                    });
-                            }
-
-                            /**
-                             * CAREGIVER MASTER
-                             */
-
-                            const caregiverMaster =
-                                await tx.caregiver_master.findFirst({
-                                    where: {
-                                        caregiver_id:
-                                            caregiver.user_id,
-                                    },
-                                });
-
-                            if (!caregiverMaster) {
-                                await tx.caregiver_master.create({
-                                    data: {
-                                        caregiver_id:
-                                            caregiver.user_id,
-
-                                        external_caregiver_id:
-                                            Number(
-                                                caregiverData.caregiver_id
-                                            ),
-
-                                        is_active: true,
-                                    },
-                                });
-                            }
+                            const caregiver = await findOrCreateCaregiver(
+                                tx,
+                                caregiverData
+                            );
 
                             /**
                              * DETERMINE SHIFT
@@ -485,52 +598,18 @@ export const loginController = async (req, res) => {
                          * CREATE CAREGIVER USER
                          */
 
-                        let caregiver = await tx.users.findFirst({
-                            where: {
-                                phone_number,
-                            },
-                        });
-
-                        if (!caregiver) {
-                            caregiver = await tx.users.create({
-                                data: {
-                                    role: "caregiver",
-                                    full_name:
-                                        record.caregiver_name,
-                                    phone_number,
-                                    is_verified: true,
-                                },
-                            });
-                        }
-
-                        /**
-                         * CAREGIVER MASTER
-                         */
-
-                        const caregiverMaster =
-                            await tx.caregiver_master.findFirst({
-                                where: {
-                                    caregiver_id:
-                                        caregiver.user_id,
-                                },
-                            });
-
-                        if (!caregiverMaster) {
-                            await tx.caregiver_master.create({
-                                data: {
-                                    caregiver_id:
-                                        caregiver.user_id,
-
-                                    external_caregiver_id:
-                                        Number(
-                                            record.caregiver_id
-                                        ),
-
-                                    is_active: true,
-                                },
-                            });
-                        }
-
+                        const caregiver = await findOrCreateCaregiver(
+                            tx,
+                            {
+                                caregiver_id:
+                                    record.caregiver_id,
+                                caregiver_name:
+                                    record.caregiver_name,
+                                caregiver_phone:
+                                    record.caregiver_phone,
+                            }
+                        )
+                        loggedInUserId = caregiver.user_id;
                         /**
                          * FIRST PATIENT ONLY
                          */
@@ -755,9 +834,9 @@ export const loginController = async (req, res) => {
              * =========================================================
              */
 
-            user = await prisma.users.findFirst({
+            user = await prisma.users.findUnique({
                 where: {
-                    phone_number,
+                    user_id: loggedInUserId,
                 },
                 select: {
                     user_id: true,
