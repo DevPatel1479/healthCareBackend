@@ -28,10 +28,11 @@ export const verifyCaregiverQr = async (req, res) => {
             });
         }
 
-        const currentDate = new Date()
-            .toISOString()
-            .split("T")[0];
-
+        // const currentDate = new Date()
+        //     .toISOString()
+        //     .split("T")[0];
+        const currentDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Kolkata" }).format(new Date());
+        console.log(currentDate);
         /**
          * -----------------------------------------
          * STEP 1 : CALL EXTERNAL API
@@ -151,8 +152,11 @@ export const verifyCaregiverQr = async (req, res) => {
             });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // const today = new Date();
+        // today.setHours(0, 0, 0, 0);
+        const today = new Date(new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Kolkata" }).format(new Date()) + "T00:00:00.000Z");
+        console.log(today);
+
 
         /**
          * -----------------------------------------
