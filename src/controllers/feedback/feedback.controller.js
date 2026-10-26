@@ -1,11 +1,11 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../lib/prisma";
 
 // Auth middleware may expose the authenticated user as
 // req.user or req.auth. Adjust this helper if your middleware
 // uses a different property.
 const getAuthUser = (req) => {
     const user = req.user ?? req.auth ?? {};
-    
+
     return {
         userId: Number(
             user.user_id ??
