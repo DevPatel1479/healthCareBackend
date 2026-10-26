@@ -1,4 +1,4 @@
-import prisma from "../../lib/prisma";
+import prisma from "../../lib/prisma.js";
 
 // Auth middleware may expose the authenticated user as
 // req.user or req.auth. Adjust this helper if your middleware
