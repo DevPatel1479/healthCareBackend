@@ -38,9 +38,9 @@ model caregiver_master {
 model caregiver_shifts {
   shift_assignment_id Int @id @default(autoincrement())
 
-  patient_id   Int
-  caregiver_id Int
-  shift_id     Int
+  patient_id      Int
+  caregiver_id    Int
+  shift_id        Int
   assignment_date DateTime @db.Date
 
   start_time DateTime  @db.Timestamp(0)
@@ -58,11 +58,11 @@ model caregiver_shifts {
 
   shifts shifts @relation(fields: [shift_id], references: [shift_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_caregiver_shift_shift")
 
+  @@unique([patient_id, caregiver_id, shift_id, assignment_date])
   @@index([patient_id])
   @@index([caregiver_id])
   @@index([shift_id])
   @@index([patient_id, end_time, verified])
-  @@unique([patient_id, caregiver_id, shift_id, assignment_date])
 }
 
 model patients {
@@ -80,6 +80,7 @@ model patients {
   task_assignments    task_assignments[]
   caregiver_shifts    caregiver_shifts[]
   completed_tasks     completed_tasks[]
+  feedback            feedback[]
 
   @@index([family_lead_id], map: "fk_family_lead")
 }
@@ -113,6 +114,7 @@ model task_assignments {
   users           users?                       @relation(fields: [caregiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_3")
   shifts          shifts?                      @relation(fields: [shift_id], references: [shift_id], onDelete: NoAction, onUpdate: NoAction, map: "task_assignments_ibfk_4")
   completed_tasks completed_tasks[]
+  feedback        feedback[]
 
   @@index([caregiver_id], map: "caregiver_id")
   @@index([patient_id], map: "patient_id")
@@ -121,22 +123,24 @@ model task_assignments {
 }
 
 model users {
-  user_id          Int                    @id @default(autoincrement())
-  role             users_role
-  full_name        String                 @db.VarChar(100)
-  email            String?                @unique(map: "email") @db.VarChar(255)
-  phone_number     String                 @db.VarChar(20)
-  password_hash    String?                @db.VarChar(255)
-  is_verified      Boolean?               @default(false)
-  last_login       DateTime?              @db.Timestamp(0)
-  created_at       DateTime?              @default(now()) @db.Timestamp(0)
-  updated_at       DateTime?              @default(now()) @db.Timestamp(0)
-  caregiver_master caregiver_master?
-  patients         patients[]
-  family_contacts  family_lead_contacts[]
-  task_assignments task_assignments[]
-  caregiver_shifts caregiver_shifts[]
-  completed_tasks  completed_tasks[]
+  user_id              Int                    @id @default(autoincrement())
+  role                 users_role
+  full_name            String                 @db.VarChar(100)
+  email                String?                @unique(map: "email") @db.VarChar(255)
+  phone_number         String                 @db.VarChar(20)
+  password_hash        String?                @db.VarChar(255)
+  is_verified          Boolean?               @default(false)
+  last_login           DateTime?              @db.Timestamp(0)
+  created_at           DateTime?              @default(now()) @db.Timestamp(0)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(0)
+  caregiver_master     caregiver_master?
+  patients             patients[]
+  family_contacts      family_lead_contacts[]
+  task_assignments     task_assignments[]
+  caregiver_shifts     caregiver_shifts[]
+  completed_tasks      completed_tasks[]
+  feedback_submissions feedback[]             @relation("feedback_submitter")
+  feedback_received    feedback[]             @relation("feedback_caregiver")
 }
 
 enum users_role {
@@ -183,6 +187,21 @@ enum completed_tasks_status {
   skipped
   refused
   partial
+}
+
+enum feedback_submitter_side {
+  patient_side
+  caregiver_side
+}
+
+enum feedback_category {
+  overall_care
+  caregiver_performance
+  communication
+  punctuality
+  task_clarity
+  app_experience
+  other
 }
 
 model completed_tasks {
@@ -237,7 +256,6 @@ model otp_verifications {
   @@index([expires_at])
 }
 
-
 model family_lead_contacts {
   id Int @id @default(autoincrement())
 
@@ -254,4 +272,36 @@ model family_lead_contacts {
   users users @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@index([user_id])
+}
+
+model feedback {
+  feedback_id          Int                     @id @default(autoincrement())
+  submitted_by_user_id Int
+  submitted_by_side    feedback_submitter_side
+  patient_id           Int
+  caregiver_id         Int?
+  assignment_id        Int?
+  rating               Int                     @db.UnsignedTinyInt
+  category             feedback_category       @default(overall_care)
+  comments             String?                 @db.Text
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp(0)
+
+  // User who submitted the feedback
+  submitter users @relation("feedback_submitter", fields: [submitted_by_user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  // Patient associated with the feedback
+  patient patients @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade, onUpdate: NoAction)
+
+  // Caregiver being reviewed
+  caregiver users? @relation("feedback_caregiver", fields: [caregiver_id], references: [user_id], onDelete: SetNull, onUpdate: NoAction)
+
+  // Related task assignment, if applicable
+  task_assignment task_assignments? @relation(fields: [assignment_id], references: [assignment_id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([submitted_by_user_id, created_at])
+  @@index([patient_id, created_at])
+  @@index([caregiver_id, created_at])
+  @@index([assignment_id])
 }
