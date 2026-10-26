@@ -588,22 +588,32 @@ export const getCaregiverTasks = async (req, res) => {
     // ==================================
     // GET TODAY COMPLETIONS
     // ==================================
+    // const completedToday = await prisma.completed_tasks.findMany({
+    //   // where: {
+    //   //   patient_id: patientInfo?.patient_id,
+    //   //   // actual_time_done: {
+    //   //   //   gte: startOfDay,
+    //   //   //   lte: endOfDay,
+    //   //   // },
+    //   //   actual_time_done: {
+    //   //     gte: startOfDay,
+    //   //     lt: nextDayStart,
+    //   //   },
+    //   // },
+    //   where: {
+    //     patient_id: patientInfo?.patient_id,
+    //     actual_time_done: {
+    //       lt: nextDayStart,
+    //     },
+    //   },
+    // });
+
     const completedToday = await prisma.completed_tasks.findMany({
-      // where: {
-      //   patient_id: patientInfo?.patient_id,
-      //   // actual_time_done: {
-      //   //   gte: startOfDay,
-      //   //   lte: endOfDay,
-      //   // },
-      //   actual_time_done: {
-      //     gte: startOfDay,
-      //     lt: nextDayStart,
-      //   },
-      // },
       where: {
         patient_id: patientInfo?.patient_id,
         actual_time_done: {
-          lt: nextDayStart,
+          gte: startOfDay,   // Include only today's IST start
+          lt: nextDayStart,  // Exclude the next day's start
         },
       },
     });
