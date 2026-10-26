@@ -623,9 +623,21 @@ export const getCaregiverTasks = async (req, res) => {
     // ==================================
 
 
+    // const completedAll = await prisma.completed_tasks.findMany({
+    //   where: {
+    //     patient_id: patientInfo?.patient_id,
+    //   },
+    //   orderBy: {
+    //     actual_time_done: "desc",
+    //   },
+    // });
+
     const completedAll = await prisma.completed_tasks.findMany({
       where: {
         patient_id: patientInfo?.patient_id,
+        actual_time_done: {
+          lt: nextDayStart,
+        },
       },
       orderBy: {
         actual_time_done: "desc",
