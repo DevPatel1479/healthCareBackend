@@ -22,7 +22,7 @@ import taskAssignmentV2Routes from "./routes/v2/task_assignment.routes.js";
 import loginV2Routes from "./routes/v2/login.routes.js";
 import systemV2Routes from "./routes/v2/system.routes.js";
 import uploadV2Routes from "./routes/v2/file.upload.routes.js";
-
+import feedbackRoutes from "./routes/v2/feedback.routes.js";
 
 const app = express()
 
@@ -74,7 +74,7 @@ app.use("/api/v2/system", systemV2Routes);
 app.use("/api/v2", caregiverV2Routes);
 app.use("/api/v2", patientV2Routes);
 app.use("/api/v2", uploadV2Routes);
-
+app.use("/api/v2/feedback", feedbackRoutes);
 
 
 app.use(errorHandler)
