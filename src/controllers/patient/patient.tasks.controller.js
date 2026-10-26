@@ -98,125 +98,71 @@ import { io } from "../../server.js";
 // };
 
 
-const getTodayDateOnly = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const getIndiaDateString = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const getPart = (type) =>
+    parts.find((part) => part.type === type)?.value;
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 };
 
-/**
- * Get IST date boundaries.
- *
- * If no date is provided:
- *    uses today's IST date
- *
- * If date is provided:
- *    expects YYYY-MM-DD
- */
+// Use UTC midnight for date-only MySQL fields.
+const getTodayDateOnly = () =>
+  new Date(`${getIndiaDateString()}T00:00:00.000Z`);
+
 const getDateBoundaries = (dateString) => {
-  let targetDate;
+  const selectedDate = dateString || getIndiaDateString();
 
-  // -----------------------------------------
-  // No date => preserve existing behavior
-  // -----------------------------------------
-
-  if (!dateString) {
-    const nowIST = new Date(
-      new Date().toLocaleString("en-US", {
-        timeZone: "Asia/Kolkata",
-      })
-    );
-
-    const startOfDay = new Date(nowIST);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(nowIST);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    return {
-      startOfDay,
-      endOfDay,
-
-      // IMPORTANT:
-      // preserve your original implementation
-      assignmentDate: getTodayDateOnly(),
-
-      selectedDate: new Date().toLocaleDateString(
-        "en-CA",
-        {
-          timeZone: "Asia/Kolkata",
-        }
-      ),
-    };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+    throw new Error("Invalid date format. Use YYYY-MM-DD");
   }
 
-  // -----------------------------------------
-  // Date provided
-  // -----------------------------------------
-
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
-    dateString
-  );
-
-  if (!match) {
-    throw new Error(
-      "Invalid date format. Use YYYY-MM-DD"
-    );
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  // Validate date
-  const validationDate = new Date(
-    year,
-    month - 1,
-    day
-  );
+  const dateCheck = new Date(`${selectedDate}T00:00:00.000Z`);
 
   if (
-    validationDate.getFullYear() !== year ||
-    validationDate.getMonth() !== month - 1 ||
-    validationDate.getDate() !== day
+    Number.isNaN(dateCheck.getTime()) ||
+    dateCheck.toISOString().slice(0, 10) !== selectedDate
   ) {
     throw new Error("Invalid date");
   }
 
-  // -----------------------------------------
-  // For requested historical date
-  // -----------------------------------------
-
+  // Start of the selected day in India, represented as an instant.
   const startOfDay = new Date(
-    year,
-    month - 1,
-    day
+    `${selectedDate}T00:00:00.000+05:30`
   );
 
-  startOfDay.setHours(0, 0, 0, 0);
+  // Exclusive end boundary: midnight of the following IST day.
+  const nextDayStart = new Date(
+    `${selectedDate}T00:00:00.000+05:30`
+  );
+
+  nextDayStart.setUTCDate(nextDayStart.getUTCDate() + 1);
 
   const endOfDay = new Date(
-    year,
-    month - 1,
-    day
+    nextDayStart.getTime() - 1
   );
 
-  endOfDay.setHours(23, 59, 59, 999);
-
-  // Preserve same Date behavior as your
-  // original getTodayDateOnly()
+  // Date-only field: preserve the requested YYYY-MM-DD value.
   const assignmentDate = new Date(
-    year,
-    month - 1,
-    day
+    `${selectedDate}T00:00:00.000Z`
   );
 
   return {
     startOfDay,
+    nextDayStart,
     endOfDay,
     assignmentDate,
-    selectedDate: dateString,
+    selectedDate,
   };
 };
+
+
 
 export const getPatientTasks = async (req, res) => {
   try {
@@ -266,6 +212,7 @@ export const getPatientTasks = async (req, res) => {
 
     const {
       startOfDay,
+      nextDayStart,
       endOfDay,
       assignmentDate,
       selectedDate,
@@ -316,10 +263,18 @@ export const getPatientTasks = async (req, res) => {
       }),
 
       prisma.completed_tasks.findMany({
+        // where: {
+        //   patient_id: patientId,
+        // },
         where: {
           patient_id: patientId,
+          actual_time_done: {
+            lt: nextDayStart,
+          },
         },
-
+        orderBy: {
+          actual_time_done: "desc",
+        },
         select: {
           task_id: true,
           status: true,
@@ -413,18 +368,41 @@ export const getPatientTasks = async (req, res) => {
       }
     );
 
+    // const todayCompletedMap = new Map();
+    // const allCompletedMap = new Map();
+
+    // completedToday.forEach((row) => {
+
+    //   // latest completion for task
+    //   allCompletedMap.set(row.task_id, row);
+
+    //   // completion done today
+    //   if (
+    //     row.actual_time_done >= startOfDay &&
+    //     row.actual_time_done <= endOfDay
+    //   ) {
+    //     todayCompletedMap.set(row.task_id, row);
+    //   }
+    // });
+
     const todayCompletedMap = new Map();
     const allCompletedMap = new Map();
 
     completedToday.forEach((row) => {
+      if (row.task_id == null || !row.actual_time_done) {
+        return;
+      }
 
-      // latest completion for task
-      allCompletedMap.set(row.task_id, row);
+      // Rows are ordered newest first, so retain the first completion.
+      if (!allCompletedMap.has(row.task_id)) {
+        allCompletedMap.set(row.task_id, row);
+      }
 
-      // completion done today
+      // Daily routines must be completed on the selected IST date.
       if (
         row.actual_time_done >= startOfDay &&
-        row.actual_time_done <= endOfDay
+        row.actual_time_done < nextDayStart &&
+        !todayCompletedMap.has(row.task_id)
       ) {
         todayCompletedMap.set(row.task_id, row);
       }

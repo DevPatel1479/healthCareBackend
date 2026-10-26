@@ -158,126 +158,190 @@ import prisma from "../../lib/prisma.js";
 // };
 
 
-const getTodayDateOnly = () => {
-  const d = new Date();
+// const getTodayDateOnly = () => {
+//   const d = new Date();
 
-  return new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate()
-  );
+//   return new Date(
+//     d.getFullYear(),
+//     d.getMonth(),
+//     d.getDate()
+//   );
+// };
+
+// /**
+//  * Get date boundaries.
+//  *
+//  * No date:
+//  *   Uses today's IST date.
+//  *
+//  * Date provided:
+//  *   Expects YYYY-MM-DD.
+//  */
+// const getDateBoundaries = (dateString) => {
+//   // =========================================
+//   // NO DATE
+//   // Preserve existing TODAY behavior
+//   // =========================================
+//   if (!dateString) {
+//     const nowIST = new Date(
+//       new Date().toLocaleString("en-US", {
+//         timeZone: "Asia/Kolkata",
+//       })
+//     );
+
+//     const startOfDay = new Date(nowIST);
+//     startOfDay.setHours(0, 0, 0, 0);
+
+//     const endOfDay = new Date(nowIST);
+//     endOfDay.setHours(23, 59, 59, 999);
+
+//     return {
+//       startOfDay,
+//       endOfDay,
+
+//       // Preserve original caregiver controller behavior
+//       assignmentDate: getTodayDateOnly(),
+
+//       selectedDate: new Date().toLocaleDateString(
+//         "en-CA",
+//         {
+//           timeZone: "Asia/Kolkata",
+//         }
+//       ),
+//     };
+//   }
+
+//   // =========================================
+//   // DATE PROVIDED
+//   // =========================================
+//   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+//     dateString
+//   );
+
+//   if (!match) {
+//     throw new Error(
+//       "Invalid date format. Use YYYY-MM-DD"
+//     );
+//   }
+
+//   const year = Number(match[1]);
+//   const month = Number(match[2]);
+//   const day = Number(match[3]);
+
+//   // =========================================
+//   // VALIDATE DATE
+//   // =========================================
+//   const validationDate = new Date(
+//     year,
+//     month - 1,
+//     day
+//   );
+
+//   if (
+//     validationDate.getFullYear() !== year ||
+//     validationDate.getMonth() !== month - 1 ||
+//     validationDate.getDate() !== day
+//   ) {
+//     throw new Error("Invalid date");
+//   }
+
+//   // =========================================
+//   // SELECTED DATE RANGE
+//   // =========================================
+//   const startOfDay = new Date(
+//     year,
+//     month - 1,
+//     day
+//   );
+
+//   startOfDay.setHours(0, 0, 0, 0);
+
+//   const endOfDay = new Date(
+//     year,
+//     month - 1,
+//     day
+//   );
+
+//   endOfDay.setHours(23, 59, 59, 999);
+
+//   const assignmentDate = new Date(
+//     year,
+//     month - 1,
+//     day
+//   );
+
+//   return {
+//     startOfDay,
+//     endOfDay,
+//     assignmentDate,
+//     selectedDate: dateString,
+//   };
+// };
+
+
+const getIndiaDateString = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const getPart = (type) =>
+    parts.find((part) => part.type === type)?.value;
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 };
 
-/**
- * Get date boundaries.
- *
- * No date:
- *   Uses today's IST date.
- *
- * Date provided:
- *   Expects YYYY-MM-DD.
- */
+// Use UTC midnight for date-only MySQL fields.
+const getTodayDateOnly = () =>
+  new Date(`${getIndiaDateString()}T00:00:00.000Z`);
+
 const getDateBoundaries = (dateString) => {
-  // =========================================
-  // NO DATE
-  // Preserve existing TODAY behavior
-  // =========================================
-  if (!dateString) {
-    const nowIST = new Date(
-      new Date().toLocaleString("en-US", {
-        timeZone: "Asia/Kolkata",
-      })
-    );
+  const selectedDate = dateString || getIndiaDateString();
 
-    const startOfDay = new Date(nowIST);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(nowIST);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    return {
-      startOfDay,
-      endOfDay,
-
-      // Preserve original caregiver controller behavior
-      assignmentDate: getTodayDateOnly(),
-
-      selectedDate: new Date().toLocaleDateString(
-        "en-CA",
-        {
-          timeZone: "Asia/Kolkata",
-        }
-      ),
-    };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+    throw new Error("Invalid date format. Use YYYY-MM-DD");
   }
 
-  // =========================================
-  // DATE PROVIDED
-  // =========================================
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
-    dateString
-  );
-
-  if (!match) {
-    throw new Error(
-      "Invalid date format. Use YYYY-MM-DD"
-    );
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  // =========================================
-  // VALIDATE DATE
-  // =========================================
-  const validationDate = new Date(
-    year,
-    month - 1,
-    day
-  );
+  const dateCheck = new Date(`${selectedDate}T00:00:00.000Z`);
 
   if (
-    validationDate.getFullYear() !== year ||
-    validationDate.getMonth() !== month - 1 ||
-    validationDate.getDate() !== day
+    Number.isNaN(dateCheck.getTime()) ||
+    dateCheck.toISOString().slice(0, 10) !== selectedDate
   ) {
     throw new Error("Invalid date");
   }
 
-  // =========================================
-  // SELECTED DATE RANGE
-  // =========================================
+  // Start of the selected day in India, represented as an instant.
   const startOfDay = new Date(
-    year,
-    month - 1,
-    day
+    `${selectedDate}T00:00:00.000+05:30`
   );
 
-  startOfDay.setHours(0, 0, 0, 0);
+  // Exclusive end boundary: midnight of the following IST day.
+  const nextDayStart = new Date(
+    `${selectedDate}T00:00:00.000+05:30`
+  );
+
+  nextDayStart.setUTCDate(nextDayStart.getUTCDate() + 1);
 
   const endOfDay = new Date(
-    year,
-    month - 1,
-    day
+    nextDayStart.getTime() - 1
   );
 
-  endOfDay.setHours(23, 59, 59, 999);
-
+  // Date-only field: preserve the requested YYYY-MM-DD value.
   const assignmentDate = new Date(
-    year,
-    month - 1,
-    day
+    `${selectedDate}T00:00:00.000Z`
   );
 
   return {
     startOfDay,
+    nextDayStart,
     endOfDay,
     assignmentDate,
-    selectedDate: dateString,
+    selectedDate,
   };
 };
-
 
 export const getCaregiverTasks = async (req, res) => {
   try {
@@ -311,6 +375,7 @@ export const getCaregiverTasks = async (req, res) => {
     }
     const {
       startOfDay,
+      nextDayStart,
       endOfDay,
       assignmentDate,
       selectedDate,
@@ -524,11 +589,21 @@ export const getCaregiverTasks = async (req, res) => {
     // GET TODAY COMPLETIONS
     // ==================================
     const completedToday = await prisma.completed_tasks.findMany({
+      // where: {
+      //   patient_id: patientInfo?.patient_id,
+      //   // actual_time_done: {
+      //   //   gte: startOfDay,
+      //   //   lte: endOfDay,
+      //   // },
+      //   actual_time_done: {
+      //     gte: startOfDay,
+      //     lt: nextDayStart,
+      //   },
+      // },
       where: {
         patient_id: patientInfo?.patient_id,
         actual_time_done: {
-          gte: startOfDay,
-          lte: endOfDay,
+          lt: nextDayStart,
         },
       },
     });

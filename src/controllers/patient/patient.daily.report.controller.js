@@ -19,9 +19,18 @@ export const getPatientDailyReport = async (req, res) => {
         }
 
         // ✅ Date range
-        const startOfDay = new Date(`${date}T00:00:00.000Z`);
+        // const startOfDay = new Date(`${date}T00:00:00.000Z`);
 
-        const endOfDay = new Date(`${date}T23:59:59.999Z`);
+        // const endOfDay = new Date(`${date}T23:59:59.999Z`);
+
+        // Report dates are India calendar dates.
+        // These Date objects represent the corresponding UTC instants.
+        const startOfDay = new Date(`${date}T00:00:00.000+05:30`);
+
+        const nextDayStart = new Date(`${date}T00:00:00.000+05:30`);
+        nextDayStart.setUTCDate(nextDayStart.getUTCDate() + 1);
+
+        const endOfDay = new Date(nextDayStart.getTime() - 1);
 
         // ✅ FETCH FROM completed_tasks
         // const completedTasks = await prisma.completed_tasks.findMany({
@@ -67,9 +76,13 @@ export const getPatientDailyReport = async (req, res) => {
         const completedTasksPromise = prisma.completed_tasks.findMany({
             where: {
                 patient_id: Number(patient_id),
+                // actual_time_done: {
+                //     gte: startOfDay,
+                //     lte: endOfDay,
+                // },
                 actual_time_done: {
                     gte: startOfDay,
-                    lte: endOfDay,
+                    lt: nextDayStart,
                 },
             },
 
@@ -170,13 +183,21 @@ export const getPatientDailyReport = async (req, res) => {
             pendingTasksPromise,
 
         ]);
+        // const completedMap = new Map();
+
+        // completedTasks.forEach(task => {
+        //     completedMap.set(task.completed_task_id, task);
+        // });
+
+        // otherCompletedTasks.forEach(task => {
+        //     completedMap.set(task.completed_task_id, task);
+        // });
+
+        // const finalCompletedTasks = [...completedMap.values()];
+
         const completedMap = new Map();
 
-        completedTasks.forEach(task => {
-            completedMap.set(task.completed_task_id, task);
-        });
-
-        otherCompletedTasks.forEach(task => {
+        completedTasks.forEach((task) => {
             completedMap.set(task.completed_task_id, task);
         });
 
@@ -188,10 +209,19 @@ export const getPatientDailyReport = async (req, res) => {
         );
 
         // Tasks completed anytime
+        // const completedEverTaskIds = new Set(
+        //     finalCompletedTasks
+        //         .filter(task => task.task_id != null)
+        //         .map(task => task.task_id)
+        // );
+
+        // Historical completions are used only to determine whether
+        // a non-daily task has ever been completed.
+        // They must not be added to the selected-date report.
         const completedEverTaskIds = new Set(
-            finalCompletedTasks
-                .filter(task => task.task_id != null)
-                .map(task => task.task_id)
+            [...completedTasks, ...otherCompletedTasks]
+                .filter((task) => task.task_id != null)
+                .map((task) => task.task_id)
         );
 
         const actualPendingTasks = returnPending
